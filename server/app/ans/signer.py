@@ -41,6 +41,24 @@ class DpopSigner:
     base_url: str
 
     @classmethod
+    def from_pem(cls, certificate_pem: str, key_pem: str, base_url: str) -> "DpopSigner":
+        """Build a signer from PEM text.
+
+        Deployments cannot ship the material on disk -- private keys must not be
+        baked into an image -- so it arrives through a secret instead.
+        """
+        try:
+            certificate = load_pem_x509_certificate(certificate_pem.encode())
+            private_key = serialization.load_pem_private_key(key_pem.encode(), password=None)
+        except ValueError as exc:
+            raise SignerError(f"could not parse ANS identity material: {exc}") from exc
+        if not isinstance(private_key, ec.EllipticCurvePrivateKey) or not isinstance(
+            private_key.curve, ec.SECP256R1
+        ):
+            raise SignerError("ANS identity key must be EC P-256")
+        return cls(certificate=certificate, private_key=private_key, base_url=base_url)
+
+    @classmethod
     def from_files(
         cls, cert_path: str | Path, key_path: str | Path, base_url: str
     ) -> "DpopSigner":

@@ -24,6 +24,8 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 
 from agents.clients import APPROVED_CONTRACT, CONSUMER_CONTRACT, PASSED_TEST, AgentClient
+from server.app.ans.material import load as load_material
+from server.app.ans.signer import DpopSigner
 from server.app.config import Settings
 
 log = logging.getLogger("synapse.demo")
@@ -46,19 +48,36 @@ class DemoRunResponse(BaseModel):
 
 
 def _run(settings: Settings, local_base: str) -> DemoRunResponse:
-    """Drive the three scripted agents with real DPoP proofs."""
-    completed: list[str] = []
+    """Drive the three scripted agents with real DPoP proofs.
+
+    Phased, not agent-by-agent. The seeded workstreams all claim
+    `src/auth/session.ts`, which is the collision the demo exists to show, and
+    the coordinator refuses a ChangeSet while any conflict is open. So every
+    agent must be re-scoped before the first submit -- the same order the
+    dashboard used to drive by hand.
+    """
+    clients = {}
+    for agent_id, _workstream, _contract, _files in PLAN:
+        # Signed against the public origin, sent over loopback: an ANS-6 verifier
+        # compares htu to its configured authority and never reads the Host
+        # header, so the proof is the same one an external caller would present.
+        certificate_pem, key_pem = load_material(agent_id, settings.ans_agent_identities)
+        signer = DpopSigner.from_pem(certificate_pem, key_pem, settings.ans_public_base_url)
+        clients[agent_id] = AgentClient(base_url=local_base, agent_id=agent_id, signer=signer)
+
+    for agent_id, _ws, _contract, _files in PLAN:
+        clients[agent_id].join()
+    for agent_id, workstream, _contract, _files in PLAN:
+        clients[agent_id].claim(workstream)
+    for agent_id, workstream, contract, _files in PLAN:
+        clients[agent_id].declare(workstream, contract)
+    # Resolve every overlap before anything is submitted.
+    for agent_id, workstream, _contract, files in PLAN:
+        clients[agent_id].scope(workstream, files)
     for agent_id, workstream, contract, files in PLAN:
-        # Sign against the public origin; send over loopback.
-        client = AgentClient.with_ans_identity(settings.ans_public_base_url, agent_id)
-        client = AgentClient(base_url=local_base, agent_id=agent_id, signer=client.signer)
-        client.join()
-        client.claim(workstream)
-        client.declare(workstream, contract)
-        client.scope(workstream, files)
-        client.submit(workstream, contract, files, PASSED_TEST)
-        completed.append(agent_id)
-    return DemoRunResponse(status="complete", agents=completed)
+        clients[agent_id].submit(workstream, contract, files, PASSED_TEST)
+
+    return DemoRunResponse(status="complete", agents=[a for a, *_ in PLAN])
 
 
 def build_demo_guard(demo_token: str | None):

@@ -77,6 +77,10 @@ class Settings(BaseSettings):
     acme_challenges: str | None = None
 
     # Porkbun DNS API, for publishing the ANS discovery records.
+    # Agent identity material for the server-side runner, as JSON:
+    # {"<agent id>": {"cert": "<base64 PEM>", "key": "<base64 PEM>"}}
+    ans_agent_identities: str | None = None
+
     porkbun_api_key: str | None = None
     porkbun_secret_key: str | None = None
 
