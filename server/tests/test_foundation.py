@@ -13,7 +13,7 @@ from server.app.store import write_state
 def test_health_and_seeded_state(tmp_path):
     path = tmp_path / "test.db"
     write_state(path, demo_state())
-    client = TestClient(create_app(Settings(
+    client = TestClient(create_app(Settings(demo_token=None, 
         database_path=path, trace_mode="cache", backend_provider="none",
         frontend_provider="none", qa_provider="none",
     )))
@@ -29,13 +29,13 @@ def test_health_and_seeded_state(tmp_path):
 def test_coordinator_events_are_available_from_trace_api(tmp_path):
     path = tmp_path / "test.db"
     write_state(path, demo_state())
-    client = TestClient(create_app(Settings(
+    client = TestClient(create_app(Settings(demo_token=None, 
         database_path=path, trace_mode="cache", backend_provider="none",
         frontend_provider="none", qa_provider="none",
     )))
 
     assert client.post("/api/agents/backend-agent/join").status_code == 200
-    traces = client.get("/traces").json()
+    traces = client.get("/api/traces").json()
 
     assert len(traces) == 1
     assert traces[0]["source"] == "coordinator"

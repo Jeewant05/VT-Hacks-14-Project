@@ -146,7 +146,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/traces": {
+    "/api/traces": {
         parameters: {
             query?: never;
             header?: never;
@@ -154,7 +154,7 @@ export interface paths {
             cookie?: never;
         };
         /** Recent */
-        get: operations["recent_traces_get"];
+        get: operations["recent_api_traces_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -333,7 +333,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/live/config": {
+    "/api/live/config": {
         parameters: {
             query?: never;
             header?: never;
@@ -341,7 +341,7 @@ export interface paths {
             cookie?: never;
         };
         /** Config */
-        get: operations["config_live_config_get"];
+        get: operations["config_api_live_config_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -350,7 +350,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/live/runs": {
+    "/api/live/runs": {
         parameters: {
             query?: never;
             header?: never;
@@ -360,14 +360,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Start */
-        post: operations["start_live_runs_post"];
+        post: operations["start_api_live_runs_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/live/runs/{run_id}": {
+    "/api/live/runs/{run_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -375,7 +375,7 @@ export interface paths {
             cookie?: never;
         };
         /** Snapshot */
-        get: operations["snapshot_live_runs__run_id__get"];
+        get: operations["snapshot_api_live_runs__run_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -384,7 +384,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/live/runs/{run_id}/events": {
+    "/api/live/runs/{run_id}/events": {
         parameters: {
             query?: never;
             header?: never;
@@ -392,7 +392,7 @@ export interface paths {
             cookie?: never;
         };
         /** Events */
-        get: operations["events_live_runs__run_id__events_get"];
+        get: operations["events_api_live_runs__run_id__events_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1228,7 +1228,7 @@ export interface operations {
             };
         };
     };
-    recent_traces_get: {
+    recent_api_traces_get: {
         parameters: {
             query?: {
                 limit?: number;
@@ -1584,7 +1584,7 @@ export interface operations {
             };
         };
     };
-    config_live_config_get: {
+    config_api_live_config_get: {
         parameters: {
             query?: never;
             header?: {
@@ -1615,7 +1615,7 @@ export interface operations {
             };
         };
     };
-    start_live_runs_post: {
+    start_api_live_runs_post: {
         parameters: {
             query?: never;
             header?: {
@@ -1650,7 +1650,7 @@ export interface operations {
             };
         };
     };
-    snapshot_live_runs__run_id__get: {
+    snapshot_api_live_runs__run_id__get: {
         parameters: {
             query?: never;
             header?: {
@@ -1683,7 +1683,7 @@ export interface operations {
             };
         };
     };
-    events_live_runs__run_id__events_get: {
+    events_api_live_runs__run_id__events_get: {
         parameters: {
             query?: never;
             header?: {

@@ -24,7 +24,7 @@ HOSTS = {
 
 
 def client(tmp_path):
-    return TestClient(create_app(Settings(database_path=tmp_path / "web.db", ans_domain=DOMAIN)))
+    return TestClient(create_app(Settings(demo_token=None, database_path=tmp_path / "web.db", ans_domain=DOMAIN)))
 
 
 def test_agent_card_ansname_matches_the_host_it_is_served_on(tmp_path):
@@ -54,3 +54,31 @@ def test_each_subdomain_serves_its_own_identity(tmp_path):
 
 def test_api_still_wins_over_the_static_mount(tmp_path):
     assert client(tmp_path).get("/api/health").status_code == 200
+
+
+def test_every_api_route_lives_under_api(tmp_path):
+    """No server route may sit outside /api.
+
+    The dashboard calls /api/* and the dev proxy no longer rewrites the prefix,
+    so a router mounted anywhere else 404s in the browser while every server-side
+    test still passes. That is exactly how /live and /traces shipped broken.
+
+    Read from the OpenAPI schema, not app.routes: included routers appear there
+    as opaque objects with no .path, so walking app.routes silently inspects
+    almost nothing and the check passes no matter what is mounted.
+    """
+    app = create_app(Settings(demo_token=None, database_path=tmp_path / "routes.db", ans_domain=DOMAIN))
+    allowed = {"/.well-known/agent-card.json"}
+    stray = [
+        path
+        for path in app.openapi()["paths"]
+        if not path.startswith("/api") and path not in allowed
+    ]
+    assert not stray, f"routes outside /api will 404 from the dashboard: {stray}"
+
+
+def test_the_paths_the_dashboard_actually_calls_exist(tmp_path):
+    """Pin the exact paths ui/src calls, so a prefix change cannot silently break them."""
+    c = client(tmp_path)
+    for path in ["/api/health", "/api/state", "/api/traces?limit=12", "/api/live/config"]:
+        assert c.get(path).status_code != 404, path

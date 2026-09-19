@@ -7,7 +7,7 @@ from server.app.tracing import TraceSink
 
 
 def build_trace_router(trace: TraceSink) -> APIRouter:
-    router = APIRouter(prefix="/traces", tags=["tracing"])
+    router = APIRouter(prefix="/api/traces", tags=["tracing"])
 
     @router.get("", response_model=list[TraceEvent])
     async def recent(limit: int = Query(100, ge=1, le=200), run_id: str | None = None):

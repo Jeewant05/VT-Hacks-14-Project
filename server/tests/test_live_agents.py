@@ -93,13 +93,13 @@ def test_invalid_proposal_commits_no_files(tmp_path):
 
 
 def test_live_config_reports_each_missing_api(tmp_path):
-    client = TestClient(create_app(Settings(
+    client = TestClient(create_app(Settings(demo_token=None, 
         database_path=tmp_path / "state.db", trace_mode="cache", backend_provider="none",
         frontend_provider="none", qa_provider="none",
     )))
 
-    config = client.get("/live/config")
-    start = client.post("/live/runs", json={"objective": "Build tasks"})
+    config = client.get("/api/live/config")
+    start = client.post("/api/live/runs", json={"objective": "Build tasks"})
 
     assert config.status_code == 200
     assert config.json()["configured"] is False

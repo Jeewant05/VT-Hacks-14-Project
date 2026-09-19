@@ -323,13 +323,13 @@
         }
       }
     },
-    "/traces": {
+    "/api/traces": {
       "get": {
         "tags": [
           "tracing"
         ],
         "summary": "Recent",
-        "operationId": "recent_traces_get",
+        "operationId": "recent_api_traces_get",
         "parameters": [
           {
             "name": "limit",
@@ -370,7 +370,7 @@
                   "items": {
                     "$ref": "#/components/schemas/TraceEvent"
                   },
-                  "title": "Response Recent Traces Get"
+                  "title": "Response Recent Api Traces Get"
                 }
               }
             }
@@ -839,13 +839,13 @@
         }
       }
     },
-    "/live/config": {
+    "/api/live/config": {
       "get": {
         "tags": [
           "live-agents"
         ],
         "summary": "Config",
-        "operationId": "config_live_config_get",
+        "operationId": "config_api_live_config_get",
         "parameters": [
           {
             "name": "x-demo-token",
@@ -886,13 +886,13 @@
         }
       }
     },
-    "/live/runs": {
+    "/api/live/runs": {
       "post": {
         "tags": [
           "live-agents"
         ],
         "summary": "Start",
-        "operationId": "start_live_runs_post",
+        "operationId": "start_api_live_runs_post",
         "parameters": [
           {
             "name": "x-demo-token",
@@ -945,13 +945,13 @@
         }
       }
     },
-    "/live/runs/{run_id}": {
+    "/api/live/runs/{run_id}": {
       "get": {
         "tags": [
           "live-agents"
         ],
         "summary": "Snapshot",
-        "operationId": "snapshot_live_runs__run_id__get",
+        "operationId": "snapshot_api_live_runs__run_id__get",
         "parameters": [
           {
             "name": "run_id",
@@ -1001,13 +1001,13 @@
         }
       }
     },
-    "/live/runs/{run_id}/events": {
+    "/api/live/runs/{run_id}/events": {
       "get": {
         "tags": [
           "live-agents"
         ],
         "summary": "Events",
-        "operationId": "events_live_runs__run_id__events_get",
+        "operationId": "events_api_live_runs__run_id__events_get",
         "parameters": [
           {
             "name": "run_id",

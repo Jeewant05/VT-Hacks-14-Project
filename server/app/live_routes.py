@@ -18,7 +18,7 @@ class LiveRunResponse(BaseModel):
 
 
 def build_live_router(runs: LiveRuns, model: str) -> APIRouter:
-    router = APIRouter(prefix="/live", tags=["live-agents"])
+    router = APIRouter(prefix="/api/live", tags=["live-agents"])
 
     @router.get("/config")
     async def config():
