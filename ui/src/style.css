@@ -405,6 +405,7 @@ main:focus { outline: none; }
 .prompt-heading small, .prompt-actions > span { color: #708075; font-size: .78rem; }
 .prompt-actions { justify-content: flex-start; }
 .prompt-actions > span { margin-left: auto; }
+.preview-notice { margin: 12px 0 0; color: #247457; font-size: .82rem; font-weight: 650; }
 .prompt-card textarea { display: block; width: 100%; min-height: 76px; border: 1px solid #ccdacf; border-radius: 9px; padding: 12px; resize: vertical; font: inherit; margin-bottom: 14px; }
 .primary, .secondary { border-radius: 8px; padding: 11px 16px; font-weight: 700; cursor: pointer; border: 1px solid #247457; }
 .primary { color: white; background: #247457; } .primary:disabled { opacity: .55; cursor: wait; }

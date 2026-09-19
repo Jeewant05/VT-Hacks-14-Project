@@ -1,10 +1,13 @@
 import asyncio
 import json
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from server.app.config import Settings
-from server.app.live_agents import LiveRun
+from server.app.live_agents import Artifact, LiveRun, LiveRuns
+from server.app.live_preview import render_agent_preview
+from server.app.live_routes import build_live_router
 from server.app.main import create_app
 
 
@@ -29,7 +32,22 @@ class FakeProvider:
                     {
                         "path": "backend/stolen.py" if self.invalid_path else "frontend/App.tsx",
                         "content": "export function App() { return null }\n",
-                    }
+                    },
+                    {
+                        "path": "frontend/preview.json",
+                        "content": json.dumps({
+                            "title": "Task Flow",
+                            "subtitle": "A focused task manager built by the agent team.",
+                            "accent": "#6d5dfc",
+                            "primary_action": "Add task",
+                            "metrics": [{"value": "3", "label": "Open tasks"}],
+                            "cards": [{
+                                "title": "Ship demo",
+                                "description": "Validate the finished preview.",
+                                "badge": "In progress",
+                            }],
+                        }),
+                    },
                 ],
             },
             "integration": {
@@ -74,7 +92,11 @@ def test_three_apis_plan_then_generate_scoped_project(tmp_path):
     }
     assert (run.root / "backend/app.py").exists()
     assert (run.root / "frontend/App.tsx").exists()
+    assert (run.root / "frontend/preview.json").exists()
     assert (run.root / "integration/README.md").exists()
+    assert run.preview_html is not None
+    assert "Task Flow" in run.preview_html
+    assert run.snapshot()["preview_url"] == "/api/live/runs/run-test/preview"
     assert run.events[-1]["event_type"] == "run_complete"
 
 
@@ -90,6 +112,35 @@ def test_invalid_proposal_commits_no_files(tmp_path):
     assert "outside frontend/" in run.events[-1]["message"]
     assert run.artifacts == []
     assert list(run.root.rglob("*")) == []
+
+
+def test_preview_escapes_agent_content_and_is_served_with_a_sandbox(tmp_path):
+    spec = {
+        "title": "<script>alert('no')</script>",
+        "subtitle": "A safe generated app.",
+        "accent": "#123456",
+        "primary_action": "Launch",
+        "metrics": [],
+        "cards": [{"title": "Card", "description": "Details", "badge": "Ready"}],
+    }
+    html = render_agent_preview(
+        "Build safely", [Artifact("frontend/preview.json", "frontend", json.dumps(spec))]
+    )
+    assert "<script>alert" not in html
+    assert "&lt;script&gt;alert" in html
+
+    runs = LiveRuns({}, tmp_path, None)  # type: ignore[arg-type]
+    run = LiveRun("run-preview", "Build safely", tmp_path / "run-preview", {})
+    run.status = "complete"
+    run.preview_html = html
+    runs.runs[run.run_id] = run
+    app = FastAPI()
+    app.include_router(build_live_router(runs, "per-role"))
+
+    response = TestClient(app).get("/api/live/runs/run-preview/preview")
+    assert response.status_code == 200
+    assert response.headers["content-security-policy"].startswith("sandbox;")
+    assert response.headers["x-content-type-options"] == "nosniff"
 
 
 def test_live_config_reports_each_missing_api(tmp_path):

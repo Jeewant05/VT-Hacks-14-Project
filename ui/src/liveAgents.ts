@@ -14,6 +14,7 @@ export type LiveSnapshot = {
   artifacts: LiveArtifact[];
   intentions: Record<string, string>;
   reports: Record<string, string>;
+  preview_url: string | null;
 };
 export type LiveConfig = {
   configured: boolean;

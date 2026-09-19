@@ -2,7 +2,7 @@ import asyncio
 import json
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from server.app.live_agents import ROLES, LiveRuns
@@ -58,6 +58,27 @@ def build_live_router(runs: LiveRuns, model: str, guard=None) -> APIRouter:
             return runs.get(run_id).snapshot()
         except KeyError as exc:
             raise HTTPException(404, "live run not found") from exc
+
+    @router.get("/runs/{run_id}/preview", response_class=HTMLResponse)
+    async def preview(run_id: str):
+        try:
+            run = runs.get(run_id)
+        except KeyError as exc:
+            raise HTTPException(404, "live run not found") from exc
+        if run.preview_html is None:
+            detail = "preview generation failed" if run.status == "failed" else "preview is still building"
+            raise HTTPException(409, detail)
+        return HTMLResponse(
+            run.preview_html,
+            headers={
+                "Cache-Control": "no-store",
+                "Content-Security-Policy": (
+                    "sandbox; default-src 'none'; style-src 'unsafe-inline'; "
+                    "img-src data:; base-uri 'none'; form-action 'none'"
+                ),
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
 
     @router.get("/runs/{run_id}/events")
     async def events(run_id: str):

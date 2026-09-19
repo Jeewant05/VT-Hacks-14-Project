@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from server.app.live_preview import PREVIEW_PATH, render_agent_preview
 from server.app.models import TraceEvent
 from server.app.providers import Provider
 from server.app.tracing import TraceSink
@@ -72,6 +73,7 @@ class LiveRun:
     artifacts: list[Artifact] = field(default_factory=list)
     intentions: dict[str, str] = field(default_factory=dict)
     reports: dict[str, str] = field(default_factory=dict)
+    preview_html: str | None = None
     status: str = "queued"
     task: asyncio.Task[None] | None = None
 
@@ -110,6 +112,9 @@ class LiveRun:
             "artifacts": [artifact.as_dict() for artifact in self.artifacts],
             "intentions": self.intentions,
             "reports": self.reports,
+            "preview_url": (
+                f"/api/live/runs/{self.run_id}/preview" if self.preview_html else None
+            ),
         }
 
     async def execute(self) -> None:
@@ -179,6 +184,13 @@ Do not write code yet. Your intention will be shared with the other two agents.
 
     async def _build(self, role: AgentRole, context: dict[str, Any]) -> dict[str, Any]:
         self.emit(role.id, "agent_started", f"{role.title} is implementing its intention")
+        preview_requirement = ""
+        if role.id == "frontend":
+            preview_requirement = f"""
+You MUST include `{PREVIEW_PATH}` in files. Its content must be a valid JSON string with this shape:
+{{"title":"app name","subtitle":"what the finished app does","accent":"#6d5dfc","primary_action":"button label","metrics":[{{"value":"8","label":"Total items"}}],"cards":[{{"title":"feature or item","description":"useful detail","badge":"status"}}]}}
+Use 2-4 metrics and 3-6 cards. This structured file drives the safe finished-application preview.
+"""
         prompt = f"""You are the {role.title} in a coordinated coding demo.
 Objective: {self.objective}
 Responsibility: {role.responsibility}
@@ -194,6 +206,7 @@ Return JSON only, without markdown fences, using this exact shape:
 {{"report":"short implementation summary","files":[{{"path":"{role.allowed_root}/relative-name","content":"complete file contents"}}]}}
 Create a small, coherent implementation aligned with all three intentions. Do not include secrets,
 absolute paths, parent-directory traversal, or files outside your assigned directory.
+{preview_requirement}
 """
         raw = await self.providers[role.id].generate(prompt)
         proposal = self._json(raw)
@@ -240,11 +253,13 @@ absolute paths, parent-directory traversal, or files outside your assigned direc
             raise ValueError(f"missing deliverables from: {', '.join(sorted(missing))}")
         if sum(len(item.content) for item in staged) > MAX_TOTAL_CHARS:
             raise ValueError("generated project exceeds the run size limit")
+        self.preview_html = render_agent_preview(self.objective, staged)
         self.emit(
             "coordinator",
             "validation_passed",
-            "Intentions, ownership, paths, duplicates, and size checks passed",
+            "Intentions, ownership, paths, duplicates, size, and preview checks passed",
         )
+        self.emit("coordinator", "preview_ready", "Built the finished application preview")
 
     def _commit(self, contract: dict[str, Any], staged: list[Artifact]) -> None:
         self._write(

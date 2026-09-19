@@ -16,6 +16,7 @@ export function LiveDashboard({ onSimulation }: Props) {
   const [selectedPath, setSelectedPath] = useState('shared/api-contract.json');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [previewNotice, setPreviewNotice] = useState('');
   const sourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
@@ -42,9 +43,52 @@ export function LiveDashboard({ onSimulation }: Props) {
     const snapshot = await getLiveRun(runId);
     setRun(snapshot);
     if (!selectedPath && snapshot.artifacts.length) setSelectedPath(snapshot.artifacts[0].path);
+    return snapshot;
+  }
+
+  function preparePreviewTab() {
+    const tab = window.open('', '_blank');
+    if (!tab) {
+      setPreviewNotice('Your browser blocked the preview tab. You can open it after the run finishes.');
+      return null;
+    }
+    tab.opener = null;
+    tab.document.title = 'Agents are building…';
+    tab.document.body.style.cssText = 'margin:0;min-height:100vh;display:grid;place-items:center;background:#f5f8f5;color:#20362b;font-family:system-ui,sans-serif';
+    const panel = tab.document.createElement('div');
+    panel.style.cssText = 'width:min(520px,calc(100% - 48px));padding:36px;border:1px solid #dbe7dc;border-radius:18px;background:white;box-shadow:0 18px 60px #23452b18';
+    const label = tab.document.createElement('p');
+    label.textContent = 'SYNAPSE · LIVE BUILD';
+    label.style.cssText = 'color:#247457;font-size:12px;font-weight:800;letter-spacing:.14em';
+    const heading = tab.document.createElement('h1');
+    heading.textContent = 'Three agents are building your app.';
+    const copy = tab.document.createElement('p');
+    copy.textContent = 'This tab will automatically switch to the finished work after intentions, code, and the preview are validated.';
+    copy.style.cssText = 'color:#65776b;line-height:1.6';
+    panel.append(label, heading, copy);
+    tab.document.body.append(panel);
+    return tab;
+  }
+
+  function finishPreview(snapshot: LiveSnapshot, tab: Window | null) {
+    if (snapshot.status === 'complete' && snapshot.preview_url) {
+      if (tab && !tab.closed) tab.location.replace(snapshot.preview_url);
+      setPreviewNotice(tab ? 'Finished app opened in the preview tab.' : 'Finished app is ready to open.');
+    } else if (snapshot.status === 'failed') {
+      if (tab && !tab.closed) {
+        tab.document.title = 'Agent build failed';
+        const heading = tab.document.querySelector('h1');
+        const copy = tab.document.querySelector('div > p:last-child');
+        if (heading) heading.textContent = 'The build did not pass validation.';
+        if (copy) copy.textContent = 'Return to the Synapse dashboard to inspect the coordinator timeline.';
+      }
+      setPreviewNotice('The preview was not published because the agent build failed validation.');
+    }
   }
 
   async function start() {
+    setPreviewNotice('');
+    const previewTab = preparePreviewTab();
     setBusy(true); setError(''); setEvents([]); setRun(null); setSelectedPath('shared/api-contract.json');
     sourceRef.current?.close();
     try {
@@ -53,21 +97,29 @@ export function LiveDashboard({ onSimulation }: Props) {
       const source = subscribeLiveRun(result.run_id, event => {
         setEvents(current => [...current, event]);
         void refresh(result.run_id).catch(() => undefined);
-        if (event.event_type === 'run_complete' || event.event_type === 'run_failed') source.close();
+        if (event.event_type === 'run_complete' || event.event_type === 'run_failed') {
+          source.close();
+          void refresh(result.run_id).then(snapshot => finishPreview(snapshot, previewTab)).catch(() => undefined);
+        }
       });
       source.onerror = () => {
         source.close();
-        void refresh(result.run_id).catch(() => undefined);
+        void refresh(result.run_id).then(snapshot => finishPreview(snapshot, previewTab)).catch(() => undefined);
       };
       sourceRef.current = source;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not start the coding agents.');
+      if (previewTab && !previewTab.closed) previewTab.close();
     } finally { setBusy(false); }
   }
 
   function reset() {
-    sourceRef.current?.close(); setRun(null); setEvents([]); setError('');
+    sourceRef.current?.close(); setRun(null); setEvents([]); setError(''); setPreviewNotice('');
     setSelectedPath('shared/api-contract.json');
+  }
+
+  function openFinishedPreview() {
+    if (run?.preview_url) window.open(run.preview_url, '_blank', 'noopener,noreferrer');
   }
 
   return <main className="live-shell">
@@ -79,7 +131,8 @@ export function LiveDashboard({ onSimulation }: Props) {
     <section className="prompt-card">
       <div className="prompt-heading"><div><label htmlFor="objective">Project objective</label><small>{config ? `3 role providers · ${config.configured ? 'ready' : 'setup required'}` : 'Checking configuration…'}</small></div>{run && <span className={`run-status status-${run.status}`}>{run.status}</span>}</div>
       <textarea id="objective" value={objective} maxLength={2000} onChange={event => setObjective(event.target.value)} disabled={busy || !!run} />
-      <div className="prompt-actions"><button className="primary" onClick={start} disabled={busy || !!run || !config?.configured}>{busy ? 'Starting…' : 'Start three coding agents'}</button>{run && <button className="secondary" onClick={reset} disabled={run.status === 'planning' || run.status === 'building'}>New run</button>}<span>Generated code stays in an isolated local run directory.</span></div>
+      <div className="prompt-actions"><button className="primary" onClick={start} disabled={busy || !!run || !config?.configured}>{busy ? 'Starting…' : 'Start three coding agents'}</button>{run?.preview_url && <button className="secondary" onClick={openFinishedPreview}>Open finished app</button>}{run && <button className="secondary" onClick={reset} disabled={run.status === 'planning' || run.status === 'building'}>New run</button>}<span>Generated code stays in an isolated local run directory.</span></div>
+      {previewNotice && <p className="preview-notice">{previewNotice}</p>}
       {config && !config.configured && <div className="setup-note"><strong>Three agent APIs needed.</strong> Set <code>BACKEND_PROVIDER</code>, <code>FRONTEND_PROVIDER</code>, and <code>QA_PROVIDER</code>, plus the matching API keys in <code>.env</code>, then restart the API.</div>}
     </section>
 
