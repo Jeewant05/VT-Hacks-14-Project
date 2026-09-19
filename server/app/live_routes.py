@@ -17,22 +17,20 @@ class LiveRunResponse(BaseModel):
     status: str
 
 
-def build_live_router(runs: LiveRuns) -> APIRouter:
+def build_live_router(runs: LiveRuns, model: str) -> APIRouter:
     router = APIRouter(prefix="/live", tags=["live-agents"])
 
     @router.get("/config")
     async def config():
         return {
             "configured": runs.configured,
-            "model": "per-role",
+            "model": model,
             "roles": [
                 {
                     "id": role.id,
                     "title": role.title,
                     "responsibility": role.responsibility,
                     "configured": role.id in runs.configured_roles,
-                    "provider": runs.providers[role.id].name if role.id in runs.providers else None,
-                    "model": runs.providers[role.id].model if role.id in runs.providers else None,
                 }
                 for role in ROLES
             ],

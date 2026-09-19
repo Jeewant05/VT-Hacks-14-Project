@@ -12,7 +12,7 @@ Git catches conflicts after code is written. Synapse catches them before.
 |---|---|---|
 | **Coordinator** (the product) | `server/app/service.py`, `coordinator.py`, `routes.py`, `store.py` | State machine for agents and workstreams. Collision rules. Scope enforcement. Event log. |
 | **Adapters** (sponsor seams) | `server/app/adapters.py`, `identity_ans.py`, `memory_databricks.py`, `tracing.py` | Identity verification (GoDaddy ANS) and decision memory / event delivery (Databricks). Each has a local fallback selected by `.env`. |
-| **Live agents** (demo scaffolding) | `server/app/live_agents.py`, `providers.py`, `live_routes.py` | Three model-driven agents that publish intentions, generate scoped project files, and stage them for validation. One provider/model per role; Hugging Face can route all three from one token. |
+| **Live agents** (demo scaffolding) | `server/app/live_agents.py`, `providers.py`, `live_routes.py` | Three LLM-driven agents that propose changes to a shared file. Shows real agents, not curl. One LLM vendor per role; scripted fallback if a key fails. |
 | **Dashboard** | `ui/` | Drives the coordinator scene by calling the HTTP API. Renders coordinator events. Separate live-agent panel. |
 | **Scripted clients** | `agents/clients.py`, `scripts/scenario.sh` | Deterministic versions of the scene. Fail-safe when LLMs or wifi are unavailable. |
 
@@ -47,7 +47,7 @@ Both default to local fixtures so a fresh clone runs with no credentials. Flippi
 
 1. Dashboard + live LLM agents + real ANS + real Databricks
 2. Flip `IDENTITY_MODE` / `MEMORY_MODE` back to local
-3. Open the credential-free guided simulation
+3. Set any `*_PROVIDER=none` → that agent becomes scripted
 4. `bash scripts/scenario.sh` in a terminal, Swagger at `/docs`
 5. Recorded video
 

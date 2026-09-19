@@ -8,7 +8,7 @@ from server.app.live_agents import LiveRun
 from server.app.main import create_app
 
 
-class FakeProvider:
+class FakeGemini:
     def __init__(self, role: str, invalid_path: bool = False):
         self.role = role
         self.invalid_path = invalid_path
@@ -42,9 +42,9 @@ class FakeProvider:
 
 def providers(invalid_frontend: bool = False):
     return {
-        "backend": FakeProvider("backend"),
-        "frontend": FakeProvider("frontend", invalid_frontend),
-        "integration": FakeProvider("integration"),
+        "backend": FakeGemini("backend"),
+        "frontend": FakeGemini("frontend", invalid_frontend),
+        "integration": FakeGemini("integration"),
     }
 
 

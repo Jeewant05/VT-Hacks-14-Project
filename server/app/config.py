@@ -4,9 +4,7 @@ from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parents[2]
-Vendor = Literal[
-    "none", "gemini", "huggingface", "cerebras", "groq", "github", "openrouter", "openai"
-]
+Vendor = Literal["none", "gemini", "cerebras", "groq", "github", "openrouter", "openai"]
 
 
 class Settings(BaseSettings):
@@ -28,15 +26,6 @@ class Settings(BaseSettings):
     gemini_api_key_qa: str | None = None
     gemini_model: str = "gemini-2.5-flash"
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
-
-    # Hugging Face Inference Providers: one shared token, optionally one model per role.
-    huggingface_api_key: str | None = None
-    hf_token: str | None = None
-    huggingface_model: str = "openai/gpt-oss-120b:fastest"
-    huggingface_model_backend: str | None = None
-    huggingface_model_frontend: str | None = None
-    huggingface_model_qa: str | None = None
-    huggingface_base_url: str = "https://router.huggingface.co/v1"
 
     cerebras_api_key: str | None = None
     cerebras_model: str | None = None
@@ -73,5 +62,7 @@ class Settings(BaseSettings):
     @property
     def live_integrations(self) -> bool:
         return (
-            self.identity_mode != "mock" or self.memory_mode != "cache" or self.live_agents_enabled
+            self.identity_mode != "mock"
+            or self.memory_mode != "cache"
+            or self.live_agents_enabled
         )
