@@ -33,7 +33,10 @@ primary_region = "iad"
 
 [http_service]
   internal_port = 8080
-  force_https = true
+  # TEMPORARILY false: ANS HTTP-01 validation fetches over plain HTTP and this
+  # RA does not follow the 301, so force_https makes every challenge fail. Set
+  # back to true once all four agents reach ACTIVE.
+  force_https = false
   auto_stop_machines = "suspend"
   auto_start_machines = true
   min_machines_running = 1

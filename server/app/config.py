@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     ans_domain: str | None = None
     # Hosts allowed to serve a transparency-log badge. Checked before the badge URL
     # from DNS is fetched, so a forged TXT record cannot redirect the verifier.
-    ans_trusted_tl_hosts: str = "api.godaddy.com,transparency.godaddy.com"
+    ans_trusted_tl_hosts: str = "transparency.ans.godaddy.com,api.godaddy.com"
     # The authority DPoP htu claims are compared against. Must come from config,
     # never from the request's Host header (ANS-6 §7.4).
     ans_public_base_url: str = "http://127.0.0.1:8000"
