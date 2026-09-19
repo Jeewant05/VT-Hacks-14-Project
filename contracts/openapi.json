@@ -846,40 +846,12 @@
         ],
         "summary": "Config",
         "operationId": "config_api_live_config_get",
-        "parameters": [
-          {
-            "name": "x-demo-token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Demo-Token"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
               }
             }
           }
@@ -961,22 +933,6 @@
               "type": "string",
               "title": "Run Id"
             }
-          },
-          {
-            "name": "x-demo-token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Demo-Token"
-            }
           }
         ],
         "responses": {
@@ -1016,22 +972,6 @@
             "schema": {
               "type": "string",
               "title": "Run Id"
-            }
-          },
-          {
-            "name": "x-demo-token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Demo-Token"
             }
           }
         ],
@@ -1100,6 +1040,26 @@
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api": {
+      "get": {
+        "tags": [
+          "web"
+        ],
+        "summary": "Service Descriptor",
+        "description": "Self-description at the endpoint URL ANS registration seals.\n\nRegistration declares https://<host>/api as the agent endpoint. Sealing a\nURL that 404s would publish a claim the service does not honour, so this\nanswers there and points at the agent card for the rest.",
+        "operationId": "service_descriptor_api_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           }

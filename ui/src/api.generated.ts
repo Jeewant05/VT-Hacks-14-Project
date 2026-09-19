@@ -418,6 +418,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Service Descriptor
+         * @description Self-description at the endpoint URL ANS registration seals.
+         *
+         *     Registration declares https://<host>/api as the agent endpoint. Sealing a
+         *     URL that 404s would publish a claim the service does not honour, so this
+         *     answers there and points at the agent card for the rest.
+         */
+        get: operations["service_descriptor_api_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/.well-known/agent-card.json": {
         parameters: {
             query?: never;
@@ -1587,9 +1611,7 @@ export interface operations {
     config_api_live_config_get: {
         parameters: {
             query?: never;
-            header?: {
-                "x-demo-token"?: string | null;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -1602,15 +1624,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1653,9 +1666,7 @@ export interface operations {
     snapshot_api_live_runs__run_id__get: {
         parameters: {
             query?: never;
-            header?: {
-                "x-demo-token"?: string | null;
-            };
+            header?: never;
             path: {
                 run_id: string;
             };
@@ -1686,9 +1697,7 @@ export interface operations {
     events_api_live_runs__run_id__events_get: {
         parameters: {
             query?: never;
-            header?: {
-                "x-demo-token"?: string | null;
-            };
+            header?: never;
             path: {
                 run_id: string;
             };
@@ -1743,6 +1752,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    service_descriptor_api_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

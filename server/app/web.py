@@ -43,6 +43,35 @@ def _agent_for_host(host: str, domain: str | None):
 def build_web_router(settings: Settings) -> APIRouter:
     router = APIRouter(tags=["web"])
 
+    @router.get("/api")
+    def service_descriptor(request: Request) -> JSONResponse:
+        """Self-description at the endpoint URL ANS registration seals.
+
+        Registration declares https://<host>/api as the agent endpoint. Sealing a
+        URL that 404s would publish a claim the service does not honour, so this
+        answers there and points at the agent card for the rest.
+        """
+        from scripts.database import ANS_VERSION
+
+        (_agent_id, name, _description), hostname = _agent_for_host(
+            request.headers.get("host", ""), settings.ans_domain
+        )
+        return JSONResponse({
+            "service": "Synapse coordinator",
+            "agent": name,
+            "ansName": f"ans://v{ANS_VERSION}.{hostname}" if hostname else None,
+            "protocol": "HTTP-API",
+            "agentCard": f"https://{hostname}/.well-known/agent-card.json",
+            "operations": {
+                "join": "POST /api/agents/{agent_id}/join",
+                "claim": "POST /api/workstreams/{workstream_id}/claim",
+                "declare": "POST /api/workstreams/{workstream_id}/declare",
+                "submit": "POST /api/workstreams/{workstream_id}/submit",
+                "state": "GET /api/state",
+            },
+            "authentication": "ANS-6 Method B (DPoP) on every privileged call",
+        })
+
     @router.get("/.well-known/agent-card.json")
     def agent_card(request: Request) -> JSONResponse:
         from scripts.database import ANS_VERSION

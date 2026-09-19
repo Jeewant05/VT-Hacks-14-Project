@@ -82,3 +82,12 @@ def test_the_paths_the_dashboard_actually_calls_exist(tmp_path):
     c = client(tmp_path)
     for path in ["/api/health", "/api/state", "/api/traces?limit=12", "/api/live/config"]:
         assert c.get(path).status_code != 404, path
+
+
+def test_the_declared_ans_endpoint_answers(tmp_path):
+    """Registration seals https://<host>/api, so that URL must not 404."""
+    c = client(tmp_path)
+    for host in HOSTS.values():
+        r = c.get("/api", headers={"Host": host})
+        assert r.status_code == 200, host
+        assert r.json()["ansName"] == f"ans://v{ANS_VERSION}.{host}"
