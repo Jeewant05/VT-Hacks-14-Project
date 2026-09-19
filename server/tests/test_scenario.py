@@ -42,6 +42,7 @@ def test_full_scene(tmp_path):
     s = c.post("/agents/backend-agent/join").json()
     assert s["agents"][0]["verified"] is True
     s = c.post("/agents/frontend-agent/join").json()
+    s = c.post("/agents/telemetry-agent/join").json()
     assert all(a["verified"] for a in s["agents"])
 
     # revoked / unknown identity is refused
@@ -49,43 +50,67 @@ def test_full_scene(tmp_path):
 
     # 2. claim
     c.post("/workstreams/backend/claim", json={"agent_id": "backend-agent"})
-    s = c.post("/workstreams/frontend/claim", json={"agent_id": "frontend-agent"}).json()
+    c.post("/workstreams/frontend/claim", json={"agent_id": "frontend-agent"})
+    s = c.post("/workstreams/telemetry/claim", json={"agent_id": "telemetry-agent"}).json()
     assert {w["status"] for w in s["workstreams"]} == {"active"}
 
     # wrong agent cannot claim
     r = c.post("/workstreams/backend/claim", json={"agent_id": "frontend-agent"})
     assert r.status_code == 403
 
-    # 3. declare -> conflict opens, decision attached
+    # 3. declare intent -> three file collisions open before implementation
     c.post("/workstreams/backend/declare",
            json={"agent_id": "backend-agent", "contract": _contract("provides", APPROVED)})
-    wrong = {"accessToken": "string", "profile": "object"}
-    s = c.post("/workstreams/frontend/declare",
-               json={"agent_id": "frontend-agent", "contract": _contract("consumes", wrong)}).json()
+    c.post("/workstreams/frontend/declare",
+           json={"agent_id": "frontend-agent", "contract": _contract("consumes", APPROVED)})
+    s = c.post("/workstreams/telemetry/declare",
+               json={"agent_id": "telemetry-agent", "contract": _contract("consumes", APPROVED)}).json()
     open_conflicts = [x for x in s["conflicts"] if x["status"] == "open"]
-    assert len(open_conflicts) == 1
-    assert open_conflicts[0]["conflicting_field"] == "accessToken"
-    assert open_conflicts[0]["decision_id"] == "auth-response"
+    assert len(open_conflicts) == 3
+    assert {x["type"] for x in open_conflicts} == {"file"}
+    assert {x["conflicting_field"] for x in open_conflicts} == {"src/auth/session.ts"}
+    assert {x["decision_id"] for x in open_conflicts} == {"scope-boundaries"}
     assert {w["status"] for w in s["workstreams"]} == {"blocked"}
     assert "conflict_opened" in _types(s)
 
     # submit while blocked -> 409
     r = c.post("/workstreams/frontend/submit",
-               json=_changeset("frontend", "frontend-agent", wrong, ["src/components/login/x.tsx"]))
+               json=_changeset("frontend", "frontend-agent", APPROVED, ["src/components/login/x.tsx"]))
     assert r.status_code == 409
 
-    # 4. redeclare -> conflict resolves
-    body = {"agent_id": "frontend-agent", "contract": _contract("consumes", APPROVED)}
-    s = c.post("/workstreams/frontend/declare", json=body).json()
+    # 4. coordinator assigns one owner per file -> collisions resolve
+    c.post("/workstreams/backend/scope", json={
+        "agent_id": "backend-agent",
+        "owned_paths": ["src/api/auth/oauth.ts", "src/auth/session.ts", "src/api/auth/oauth.test.ts"],
+    })
+    c.post("/workstreams/frontend/scope", json={
+        "agent_id": "frontend-agent",
+        "owned_paths": ["src/components/login/OrganizationLogin.tsx", "src/components/login/x.tsx"],
+    })
+    s = c.post("/workstreams/telemetry/scope", json={
+        "agent_id": "telemetry-agent",
+        "owned_paths": ["src/lib/analytics/authEvents.ts"],
+    }).json()
     assert all(x["status"] == "resolved" for x in s["conflicts"])
     assert {w["status"] for w in s["workstreams"]} == {"active"}
     assert "conflict_resolved" in _types(s)
+    assert _types(s).count("scope_reassigned") == 3
 
-    # 5. submit both -> complete
+    # reassignment is enforced, not just displayed
+    escaped = _changeset("frontend", "frontend-agent", APPROVED, ["src/auth/session.ts"])
+    r = c.post("/workstreams/frontend/submit", json=escaped)
+    assert r.status_code == 409
+    assert "outside owned scope" in r.json()["detail"]
+
+    # 5. submit all three independent ChangeSets -> complete
     c.post("/workstreams/backend/submit",
-           json=_changeset("backend", "backend-agent", APPROVED, ["src/api/auth/oauth.ts"]))
+           json=_changeset("backend", "backend-agent", APPROVED,
+                           ["src/api/auth/oauth.ts", "src/auth/session.ts"]))
     cs = _changeset("frontend", "frontend-agent", APPROVED, ["src/components/login/x.tsx"])
-    s = c.post("/workstreams/frontend/submit", json=cs).json()
+    c.post("/workstreams/frontend/submit", json=cs)
+    telemetry = _changeset("telemetry", "telemetry-agent", APPROVED,
+                           ["src/lib/analytics/authEvents.ts"])
+    s = c.post("/workstreams/telemetry/submit", json=telemetry).json()
     assert {w["status"] for w in s["workstreams"]} == {"complete"}
     assert s["objective"]["status"] == "complete"
     assert _types(s)[-1] == "objective_completed"

@@ -10,7 +10,7 @@ from pathlib import PurePosixPath
 from server.app.models import Conflict, Workstream
 
 
-def _paths_overlap(a: str, b: str) -> bool:
+def paths_overlap(a: str, b: str) -> bool:
     """Glob-aware overlap: 'src/api/**' overlaps 'src/api/auth/**' and 'src/api/x.py'."""
     if a == b:
         return True
@@ -26,7 +26,7 @@ def file_conflicts(workstreams: list[Workstream]) -> list[Conflict]:
     found: list[Conflict] = []
     for x, y in combinations(workstreams, 2):
         hits = [
-            (p, q) for p in x.owned_paths for q in y.owned_paths if _paths_overlap(p, q)
+            (p, q) for p in x.owned_paths for q in y.owned_paths if paths_overlap(p, q)
         ]
         if hits:
             p, q = hits[0]

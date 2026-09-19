@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from server.app.adapters import IdentityAdapter, MemoryAdapter
-from server.app.coordinator import find_conflicts
+from server.app.coordinator import find_conflicts, paths_overlap
 from server.app.models import (
     ApiContract,
     ChangeSet,
@@ -26,6 +26,7 @@ from server.app.store import read_state, write_state
 AGENT_JOINED = "agent_joined"
 AGENT_REJECTED = "agent_rejected"
 WORKSTREAM_CLAIMED = "workstream_claimed"
+SCOPE_REASSIGNED = "scope_reassigned"
 CONTRACT_DECLARED = "contract_declared"
 CONFLICT_OPENED = "conflict_opened"
 CONFLICT_RESOLVED = "conflict_resolved"
@@ -98,8 +99,7 @@ class Coordinator:
         for cid, conflict in current.items():
             if cid in existing and existing[cid].status == "open":
                 continue
-            if conflict.type == "contract":
-                await self._attach_decision(conflict)
+            await self._attach_decision(conflict)
             state.conflicts = [c for c in state.conflicts if c.id != cid]
             state.conflicts.append(conflict)
             await self._emit(state, CONFLICT_OPENED, None, actor, {
@@ -126,7 +126,12 @@ class Coordinator:
     async def _attach_decision(self, conflict: Conflict) -> None:
         """Databricks hook. P3 replaces the adapter; this call stays the same."""
         try:
-            hits = await self.memory.search(f"{conflict.explanation} {conflict.conflicting_field}")
+            query = (
+                "workstream ownership scope boundaries one owner file collision"
+                if conflict.type == "file"
+                else f"{conflict.explanation} {conflict.conflicting_field}"
+            )
+            hits = await self.memory.search(query)
         except Exception as exc:  # noqa: BLE001 - memory must never stall the demo
             log.warning("memory.search failed: %s", exc)
             hits = []
@@ -189,6 +194,30 @@ class Coordinator:
             write_state(self.db_path, state)
             return state
 
+    async def reassign_scope(
+        self, ws_id: str, agent_id: str, owned_paths: list[str]
+    ) -> WorkspaceState:
+        """Apply a coordinator-approved file plan before an agent edits code."""
+        with self._lock:
+            state = read_state(self.db_path)
+            ws = self._ws(state, ws_id)
+            if ws.agent_id != agent_id:
+                raise Forbidden(f"{ws_id} is assigned to {ws.agent_id}")
+            if not owned_paths:
+                raise Blocked("a workstream must own at least one path")
+            previous_paths = list(ws.owned_paths)
+            ws.owned_paths = owned_paths
+            await self._emit(
+                state,
+                SCOPE_REASSIGNED,
+                ws_id,
+                agent_id,
+                {"previous_paths": previous_paths, "owned_paths": owned_paths},
+            )
+            await self._recompute_conflicts(state, agent_id)
+            write_state(self.db_path, state)
+            return state
+
     async def submit(self, ws_id: str, changeset: ChangeSet) -> WorkspaceState:
         with self._lock:
             state = read_state(self.db_path)
@@ -202,6 +231,44 @@ class Coordinator:
                                   "open_conflicts": [c.id for c in open_conflicts]})
                 write_state(self.db_path, state)
                 raise Blocked(f"open conflicts: {[c.id for c in open_conflicts]}")
+            outside_scope = [
+                file
+                for file in changeset.files
+                if not any(paths_overlap(file, owned) for owned in ws.owned_paths)
+            ]
+            if outside_scope:
+                await self._emit(
+                    state,
+                    CHANGESET_REJECTED,
+                    ws_id,
+                    changeset.agent_id,
+                    {"changeset_id": changeset.id, "reason": "files outside owned scope",
+                     "files": outside_scope},
+                )
+                write_state(self.db_path, state)
+                raise Blocked(f"files outside owned scope: {outside_scope}")
+            accepted_files = [
+                file
+                for other in state.workstreams
+                if other.id != ws_id and other.latest_changeset
+                for file in other.latest_changeset.files
+            ]
+            overlaps = [
+                file
+                for file in changeset.files
+                if any(paths_overlap(file, accepted) for accepted in accepted_files)
+            ]
+            if overlaps:
+                await self._emit(
+                    state,
+                    CHANGESET_REJECTED,
+                    ws_id,
+                    changeset.agent_id,
+                    {"changeset_id": changeset.id, "reason": "files overlap an accepted changeset",
+                     "files": overlaps},
+                )
+                write_state(self.db_path, state)
+                raise Blocked(f"files overlap an accepted changeset: {overlaps}")
             if changeset.contract != ws.contract:
                 await self._emit(state, CHANGESET_REJECTED, ws_id, changeset.agent_id,
                                  {"changeset_id": changeset.id,

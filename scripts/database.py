@@ -17,16 +17,17 @@ def demo_state() -> WorkspaceState:
         objective=Objective(
             id="oauth-objective",
             title="Add organization-level OAuth login",
-            description="Coordinate backend and frontend changes before merge.",
+            description="Coordinate three coding agents before they edit overlapping files.",
             acceptance_criteria=[
-                "Verify participating agent identities through ANS.",
-                "Align both agents on the approved authentication contract.",
-                "Review changes, tests, and conflict resolution together.",
+                "Verify all three participating coding agents.",
+                "Detect overlapping file intent before implementation begins.",
+                "Reassign clear ownership and review the independent ChangeSets together.",
             ],
         ),
         agents=[
             AgentPrincipal(id="backend-agent", ans_name="backend.demo", role="backend"),
             AgentPrincipal(id="frontend-agent", ans_name="frontend.demo", role="frontend"),
+            AgentPrincipal(id="telemetry-agent", ans_name="telemetry.demo", role="telemetry"),
         ],
         workstreams=[
             Workstream(
@@ -34,7 +35,7 @@ def demo_state() -> WorkspaceState:
                 objective_id="oauth-objective",
                 title="OAuth API",
                 agent_id="backend-agent",
-                owned_paths=["src/api/auth/**"],
+                owned_paths=["src/api/auth/oauth.ts", "src/auth/session.ts"],
                 contract=ApiContract(
                     method="POST",
                     path="/api/oauth",
@@ -47,13 +48,27 @@ def demo_state() -> WorkspaceState:
                 objective_id="oauth-objective",
                 title="Organization login",
                 agent_id="frontend-agent",
-                owned_paths=["src/components/login/**"],
+                owned_paths=["src/components/login/OrganizationLogin.tsx", "src/auth/session.ts"],
                 depends_on=["backend"],
                 contract=ApiContract(
                     method="POST",
                     path="/api/oauth",
                     role="consumes",
-                    response_fields={"accessToken": "string", "profile": "object"},
+                    response_fields={"token": "string", "user": "object"},
+                ),
+            ),
+            Workstream(
+                id="telemetry",
+                objective_id="oauth-objective",
+                title="Login telemetry",
+                agent_id="telemetry-agent",
+                owned_paths=["src/lib/analytics/authEvents.ts", "src/auth/session.ts"],
+                depends_on=["backend"],
+                contract=ApiContract(
+                    method="POST",
+                    path="/api/oauth",
+                    role="consumes",
+                    response_fields={"token": "string", "user": "object"},
                 ),
             ),
         ],
@@ -68,7 +83,7 @@ def demo_state() -> WorkspaceState:
             Decision(
                 decision_id="scope-boundaries",
                 title="Workstream ownership",
-                content="Backend owns src/api/auth/**; frontend owns src/components/login/**.",
+                content="One agent owns each file. Shared session logic stays with backend; UI and telemetry consume its contract from separate files.",
                 affected_component="coordination",
                 created_at="2026-09-19T00:00:00Z",
             ),

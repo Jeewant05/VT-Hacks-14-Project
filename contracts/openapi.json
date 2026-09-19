@@ -178,6 +178,55 @@
         }
       }
     },
+    "/workstreams/{ws_id}/scope": {
+      "post": {
+        "summary": "Reassign Scope",
+        "operationId": "reassign_scope_workstreams__ws_id__scope_post",
+        "parameters": [
+          {
+            "name": "ws_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ws Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/workstreams/{ws_id}/submit": {
       "post": {
         "summary": "Submit",
@@ -642,6 +691,27 @@
           "acceptance_criteria"
         ],
         "title": "Objective"
+      },
+      "ScopeRequest": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "owned_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Owned Paths"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_id",
+          "owned_paths"
+        ],
+        "title": "ScopeRequest"
       },
       "TestResult": {
         "properties": {

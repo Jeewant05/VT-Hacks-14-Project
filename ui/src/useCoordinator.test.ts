@@ -8,6 +8,7 @@ const state = (overrides: Partial<WorkspaceState> = {}): WorkspaceState => ({
   agents: [
     { id: 'backend-agent', ans_name: 'backend.demo', role: 'backend', verified: false },
     { id: 'frontend-agent', ans_name: 'frontend.demo', role: 'frontend', verified: false },
+    { id: 'telemetry-agent', ans_name: 'telemetry.demo', role: 'telemetry', verified: false },
   ],
   workstreams: [], conflicts: [], decisions: [], events: [], ...overrides,
 });
@@ -20,17 +21,17 @@ describe('coordinator workspace presentation', () => {
   it('shows the server conflict while convergence is blocked', () => {
     const workspace = state({
       agents: state().agents?.map(agent => ({ ...agent, verified: true })),
-      conflicts: [{ id: 'contract:backend:frontend', type: 'contract', workstream_ids: ['backend', 'frontend'], explanation: 'Mismatch', conflicting_field: 'accessToken', recommendation: 'Use token', status: 'open' }],
-      events: [{ event_id: 'evt-1', objective_id: 'oauth', event_type: 'conflict_opened', payload: { decision_id: 'auth-response' }, timestamp: '2026-09-19T14:00:00Z' }],
+      conflicts: [{ id: 'file:backend:frontend', type: 'file', workstream_ids: ['backend', 'frontend'], explanation: 'Overlap', conflicting_field: 'src/auth/session.ts', recommendation: 'Assign one owner', status: 'open' }],
+      events: [{ event_id: 'evt-1', objective_id: 'oauth', event_type: 'conflict_opened', payload: { type: 'file' }, timestamp: '2026-09-19T14:00:00Z' }],
     });
     const demo = workspaceToDemo(workspace);
     expect(demo.phase).toBe('conflict');
-    expect(demo.events[0]).toMatchObject({ title: 'Contract mismatch detected', evidence: 'contract' });
+    expect(demo.events[0]).toMatchObject({ title: 'File collision predicted', evidence: 'scope' });
   });
 
   it('stays in correction and submission states while API actions are pending', () => {
     const resolved = state({ events: [{ event_id: 'evt-2', objective_id: 'oauth', event_type: 'conflict_resolved', timestamp: '2026-09-19T14:01:00Z' }] });
-    expect(workspaceToDemo(resolved, 'correct').phase).toBe('correcting');
+    expect(workspaceToDemo(resolved, 'coordinate').phase).toBe('coordinating');
     expect(workspaceToDemo(resolved).phase).toBe('aligned');
     expect(workspaceToDemo(resolved, 'submit').phase).toBe('submitting');
   });

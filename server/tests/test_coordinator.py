@@ -14,17 +14,11 @@ def _ws(id: str, paths: list[str], role: str, fields: dict[str, str]) -> Workstr
     )
 
 
-def test_seeded_scenario_is_a_contract_conflict_on_accessToken():
+def test_seeded_scenario_predicts_three_file_collisions():
     conflicts = find_conflicts(demo_state().workstreams)
-    assert [c.type for c in conflicts] == ["contract"]
-    c = conflicts[0]
-    assert c.workstream_ids == ["backend", "frontend"]
-    assert c.conflicting_field == "accessToken"
-    assert c.status == "open"
-
-
-def test_no_file_conflict_in_seed():
-    assert file_conflicts(demo_state().workstreams) == []
+    assert [c.type for c in conflicts] == ["file", "file", "file"]
+    assert {c.conflicting_field for c in conflicts} == {"src/auth/session.ts"}
+    assert all(c.status == "open" for c in conflicts)
 
 
 def test_compatible_contracts_clear_the_conflict():

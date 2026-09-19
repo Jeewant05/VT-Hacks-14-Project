@@ -16,7 +16,7 @@ def test_health_and_seeded_state(tmp_path):
     client = TestClient(create_app(Settings(database_path=path)))
     assert client.get("/health").json()["live_integrations"] is False
     state = client.get("/state").json()
-    assert len(state["workstreams"]) == 2
+    assert len(state["workstreams"]) == 3
     assert not any(agent["verified"] for agent in state["agents"])
     assert state["workstreams"][0]["contract"] != state["workstreams"][1]["contract"]
 

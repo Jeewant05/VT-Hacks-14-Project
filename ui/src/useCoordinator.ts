@@ -6,10 +6,9 @@ export type WorkspaceState = components['schemas']['WorkspaceState'];
 export type Health = components['schemas']['Health'];
 type ApiContract = components['schemas']['ApiContract'];
 type ChangeSet = components['schemas']['ChangeSet'];
-type PendingAction = 'start' | 'correct' | 'submit' | 'reset' | null;
+type PendingAction = 'start' | 'coordinate' | 'submit' | 'reset' | null;
 
 const approvedFields = { token: 'string', user: 'object' };
-const incompatibleFields = { accessToken: 'string', profile: 'object' };
 
 const contract = (role: 'provides' | 'consumes', fields: Record<string, string>): ApiContract => ({
   method: 'POST', path: '/api/oauth', role, request_fields: {}, response_fields: fields,
@@ -22,12 +21,13 @@ function eventPresentation(event: NonNullable<WorkspaceState['events']>[number],
     agent_rejected: { title: 'Agent rejected', detail: `${event.agent_id ?? 'Unknown agent'} could not join.`, tone: 'warning', evidence: 'identity' },
     workstream_claimed: { title: 'Workstream claimed', detail: `${event.workstream_id ?? 'Workstream'} scope assigned.`, tone: 'neutral' },
     contract_declared: { title: 'Contract declared', detail: `${event.workstream_id ?? 'Workstream'} declared POST /api/oauth.`, tone: 'neutral', evidence: 'contract' },
-    conflict_opened: { title: 'Contract mismatch detected', detail: 'Convergence blocked; project decision attached.', tone: 'warning', evidence: 'contract' },
-    conflict_resolved: { title: 'Contract conflict resolved', detail: 'Both workstreams now declare token + user.', tone: 'success', evidence: 'contract' },
+    conflict_opened: { title: event.payload?.type === 'file' ? 'File collision predicted' : 'Contract mismatch detected', detail: event.payload?.type === 'file' ? 'Two coding agents planned to edit the same file. Work paused before edits began.' : 'Convergence blocked; project decision attached.', tone: 'warning', evidence: event.payload?.type === 'file' ? 'scope' : 'contract' },
+    scope_reassigned: { title: 'Ownership reassigned', detail: `${event.workstream_id ?? 'Workstream'} received a non-overlapping file scope.`, tone: 'neutral', evidence: 'scope' },
+    conflict_resolved: { title: 'Planned collision cleared', detail: 'The proposed file scopes no longer overlap.', tone: 'success', evidence: 'scope' },
     changeset_rejected: { title: 'ChangeSet rejected', detail: 'An open conflict prevented submission.', tone: 'warning', evidence: 'contract' },
     changeset_submitted: { title: 'ChangeSet submitted', detail: `${event.workstream_id ?? 'Workstream'} manifest and test report accepted.`, tone: 'success', evidence: 'tests' },
     workstream_completed: { title: 'Workstream complete', detail: `${event.workstream_id ?? 'Workstream'} is ready for review.`, tone: 'success' },
-    objective_completed: { title: 'Ready for Convergence review', detail: 'Two compatible ChangeSets. No open conflicts.', tone: 'success', evidence: 'tests' },
+    objective_completed: { title: 'Ready for Convergence review', detail: 'Three independent ChangeSets. No open conflicts.', tone: 'success', evidence: 'tests' },
   };
   const fallback = { title: event.event_type.replaceAll('_', ' '), detail: 'Coordinator event recorded.', tone: 'neutral' as const };
   const rendered = definitions[event.event_type] ?? fallback;
@@ -45,10 +45,10 @@ export function workspaceToDemo(state: WorkspaceState | null, pending: PendingAc
 
   if (state.objective?.status === 'complete') phase = 'complete';
   else if (pending === 'submit') phase = 'submitting';
-  else if (pending === 'correct') phase = 'correcting';
+  else if (pending === 'coordinate') phase = 'coordinating';
   else if (openConflict) phase = 'conflict';
   else if (resolved) phase = 'aligned';
-  else if (pending === 'start' && verifiedCount === 2) phase = 'context';
+  else if (pending === 'start' && verifiedCount === 3) phase = 'context';
   else if (pending === 'start') phase = 'verifying';
   else if (verifiedCount > 0) phase = 'context';
 
@@ -56,7 +56,7 @@ export function workspaceToDemo(state: WorkspaceState | null, pending: PendingAc
   return {
     phase,
     events: presented.length ? presented : [{
-      id: 'objective', title: 'Objective created', detail: 'Two workstreams assigned to a shared objective.',
+      id: 'objective', title: 'Objective created', detail: 'Three coding agents are ready to declare planned file touches.',
       time: 'Ready', tone: 'neutral',
     }],
   };
@@ -129,20 +129,25 @@ export function useCoordinator() {
     await post('/reset');
     await post('/agents/backend-agent/join');
     await post('/agents/frontend-agent/join');
+    await post('/agents/telemetry-agent/join');
     await post('/workstreams/backend/claim', { agent_id: 'backend-agent' });
     await post('/workstreams/frontend/claim', { agent_id: 'frontend-agent' });
+    await post('/workstreams/telemetry/claim', { agent_id: 'telemetry-agent' });
     await post('/workstreams/backend/declare', { agent_id: 'backend-agent', contract: contract('provides', approvedFields) });
-    await post('/workstreams/frontend/declare', { agent_id: 'frontend-agent', contract: contract('consumes', incompatibleFields) });
+    await post('/workstreams/frontend/declare', { agent_id: 'frontend-agent', contract: contract('consumes', approvedFields) });
+    await post('/workstreams/telemetry/declare', { agent_id: 'telemetry-agent', contract: contract('consumes', approvedFields) });
   }), [perform, post]);
 
-  const acceptCorrection = useCallback(() => perform('correct', async () => {
-    await post('/workstreams/frontend/declare', { agent_id: 'frontend-agent', contract: contract('consumes', approvedFields) });
+  const applyPlan = useCallback(() => perform('coordinate', async () => {
+    await post('/workstreams/backend/scope', { agent_id: 'backend-agent', owned_paths: ['src/api/auth/oauth.ts', 'src/auth/session.ts', 'src/api/auth/oauth.test.ts'] });
+    await post('/workstreams/frontend/scope', { agent_id: 'frontend-agent', owned_paths: ['src/components/login/OrganizationLogin.tsx', 'src/components/login/OrganizationLogin.test.tsx'] });
+    await post('/workstreams/telemetry/scope', { agent_id: 'telemetry-agent', owned_paths: ['src/lib/analytics/authEvents.ts'] });
   }), [perform, post]);
 
   const submit = useCallback(() => perform('submit', async () => {
     const backend: ChangeSet = {
       id: 'cs-backend-demo', workstream_id: 'backend', agent_id: 'backend-agent',
-      files: ['src/api/auth/oauth.ts', 'src/api/auth/oauth.test.ts'],
+      files: ['src/api/auth/oauth.ts', 'src/auth/session.ts', 'src/api/auth/oauth.test.ts'],
       contract: contract('provides', approvedFields),
       tests: [
         { name: 'OAuth returns token and user', status: 'passed', source: 'agent_reported' },
@@ -158,8 +163,17 @@ export function useCoordinator() {
         { name: 'Authenticated user is displayed', status: 'passed', source: 'agent_reported' },
       ],
     };
+    const telemetry: ChangeSet = {
+      id: 'cs-telemetry-demo', workstream_id: 'telemetry', agent_id: 'telemetry-agent',
+      files: ['src/lib/analytics/authEvents.ts'],
+      contract: contract('consumes', approvedFields),
+      tests: [
+        { name: 'Login completion emits once', status: 'passed', source: 'agent_reported' },
+      ],
+    };
     await post('/workstreams/backend/submit', backend);
     await post('/workstreams/frontend/submit', frontend);
+    await post('/workstreams/telemetry/submit', telemetry);
   }), [perform, post]);
 
   const reset = useCallback(() => perform('reset', async () => { await post('/reset'); }), [perform, post]);
@@ -168,6 +182,6 @@ export function useCoordinator() {
   return {
     workspace, health, demo, error, pending, updatedAt,
     connected: Boolean(health), busy: pending !== null,
-    refresh, start, acceptCorrection, submit, reset,
+    refresh, start, applyPlan, submit, reset,
   };
 }

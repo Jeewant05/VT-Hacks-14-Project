@@ -1,6 +1,6 @@
 # Synapse
 
-A hackathon demo of pre-merge coordination between two coding agents. This repository currently contains the **foundation milestone**, not a working conflict-prevention product.
+A hackathon demo of pre-merge coordination between three coding agents. Each agent publishes its intended file touches before implementation; the coordinator detects overlap, applies exclusive ownership, and accepts only conflict-free ChangeSets.
 
 ## Quick start
 
@@ -14,7 +14,7 @@ npm run setup
 npm run dev
 ```
 
-Open http://127.0.0.1:5173. The dashboard should show **Backend connected**, the prepared OAuth objective, and two pending workstreams. API documentation is at http://127.0.0.1:8000/docs. Stop both services with Ctrl+C.
+Open http://127.0.0.1:5173. The dashboard should show **Coordinator connected**, the prepared OAuth objective, and three pending workstreams. API documentation is at http://127.0.0.1:8000/docs. Stop both services with Ctrl+C.
 
 No sponsor credentials are required for setup. `IDENTITY_MODE=mock` and `MEMORY_MODE=cache` are the only implemented modes. Mock identity results are fixtures, not ANS verification. The memory adapter is an in-process development fixture, not durable Databricks delivery. Seeded decisions are local fixtures.
 
@@ -47,6 +47,6 @@ The database defaults to `.local/synapse.db`. Reset touches only local workspace
 
 Pydantic models in `server/app/models.py` are the source of truth. Run `npm run contracts` after model or endpoint changes, and commit all generated files. Do not edit `ui/src/api.generated.ts` manually. Exact dependency resolutions are committed in `uv.lock` and `package-lock.json`; use `uv sync --locked` and `npm ci` for repeatable installs.
 
-The coordinator exposes health/state reads plus agent join, workstream claim, contract declaration, ChangeSet submission, and local reset endpoints. The guided UI calls these endpoints through the Vite `/api` proxy. The official Python MCP SDK is installed, but no MCP transport or tools are exposed yet. Production hosting/proxy configuration remains outside this milestone.
+The coordinator exposes health/state reads plus agent join, workstream claim, contract declaration, scope reassignment, ChangeSet submission, and local reset endpoints. The guided UI calls these endpoints through the Vite `/api` proxy. The official Python MCP SDK is installed, but no MCP transport or tools are exposed yet. Production hosting/proxy configuration remains outside this milestone.
 
 See [scope and team handoff](docs/SETUP.md) and [demo runbook](docs/DEMO.md). Keep secrets in ignored `.env`; never commit credentials, keys, or local database files.

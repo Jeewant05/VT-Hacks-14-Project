@@ -16,6 +16,11 @@ class DeclareRequest(BaseModel):
     contract: ApiContract
 
 
+class ScopeRequest(BaseModel):
+    agent_id: str
+    owned_paths: list[str]
+
+
 def build_router(coordinator: Coordinator, fresh_state) -> APIRouter:
     router = APIRouter()
 
@@ -45,6 +50,17 @@ def build_router(coordinator: Coordinator, fresh_state) -> APIRouter:
             raise HTTPException(404, str(e)) from e
         except Forbidden as e:
             raise HTTPException(403, str(e)) from e
+
+    @router.post("/workstreams/{ws_id}/scope", response_model=WorkspaceState)
+    async def reassign_scope(ws_id: str, body: ScopeRequest):
+        try:
+            return await coordinator.reassign_scope(ws_id, body.agent_id, body.owned_paths)
+        except NotFound as e:
+            raise HTTPException(404, str(e)) from e
+        except Forbidden as e:
+            raise HTTPException(403, str(e)) from e
+        except Blocked as e:
+            raise HTTPException(409, str(e)) from e
 
     @router.post("/workstreams/{ws_id}/submit", response_model=WorkspaceState)
     async def submit(ws_id: str, body: ChangeSet):

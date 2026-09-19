@@ -19,7 +19,7 @@ class MockIdentity:
     async def verify(self, agent: AgentPrincipal) -> VerificationResult:
         return VerificationResult(
             agent_id=agent.id,
-            verified=agent.id in {"backend-agent", "frontend-agent"},
+            verified=agent.id in {"backend-agent", "frontend-agent", "telemetry-agent"},
             source="mock",
             evidence="Local allowlist fixture only; no ANS operation performed.",
             checked_at=datetime.now(UTC).isoformat(),

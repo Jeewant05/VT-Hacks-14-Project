@@ -89,7 +89,7 @@ complete api-contract.json content. Do not use markdown and do not modify other 
             value = value.split("\n", 1)[1].rsplit("```", 1)[0]
         data = json.loads(value)
         if not isinstance(data.get("report"), str) or not isinstance(data.get("proposed_content"), str):
-            raise ValueError("Gemini response must contain report and proposed_content")
+            raise TypeError("Gemini response must contain report and proposed_content")
         return data
 
 

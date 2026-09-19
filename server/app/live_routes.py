@@ -23,7 +23,7 @@ def build_live_router(runs: LiveRuns) -> APIRouter:
     @router.post("/runs", response_model=LiveRunResponse)
     async def start(body: LiveStartRequest):
         run_id = f"run-{uuid.uuid4().hex[:8]}"
-        run = runs.start(run_id, body.objective)
+        runs.start(run_id, body.objective)
         return LiveRunResponse(run_id=run_id, status="started")
 
     @router.get("/runs/{run_id}/events")

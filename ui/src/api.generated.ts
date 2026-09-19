@@ -89,6 +89,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workstreams/{ws_id}/scope": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reassign Scope */
+        post: operations["reassign_scope_workstreams__ws_id__scope_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workstreams/{ws_id}/submit": {
         parameters: {
             query?: never;
@@ -292,6 +309,13 @@ export interface components {
              */
             status: "active" | "complete";
         };
+        /** ScopeRequest */
+        ScopeRequest: {
+            /** Agent Id */
+            agent_id: string;
+            /** Owned Paths */
+            owned_paths: string[];
+        };
         /** TestResult */
         TestResult: {
             /** Name */
@@ -491,6 +515,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["DeclareRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reassign_scope_workstreams__ws_id__scope_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ws_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScopeRequest"];
             };
         };
         responses: {
