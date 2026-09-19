@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parents[2]
+Vendor = Literal["none", "gemini", "cerebras", "groq", "github", "openrouter", "openai"]
 
 
 class Settings(BaseSettings):
@@ -13,21 +14,34 @@ class Settings(BaseSettings):
     database_path: Path = Path(".local/synapse.db")
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
-    # Live agents (Hoai)
-    agent_provider: Literal["none", "gemini"] = "none"
+    # One independent provider per role. "none" keeps that live role unconfigured.
+    backend_provider: Vendor = "none"
+    frontend_provider: Vendor = "none"
+    qa_provider: Vendor = "none"
+
+    # Gemini supports a shared fallback key plus a dedicated key for each role.
     gemini_api_key: str | None = None
-    gemini_backend_api_key: str | None = None
-    gemini_frontend_api_key: str | None = None
-    gemini_integration_api_key: str | None = None
+    gemini_api_key_backend: str | None = None
+    gemini_api_key_frontend: str | None = None
+    gemini_api_key_qa: str | None = None
     gemini_model: str = "gemini-2.5-flash"
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
 
-    # GoDaddy ANS (P4)
+    cerebras_api_key: str | None = None
+    cerebras_model: str | None = None
+    groq_api_key: str | None = None
+    groq_model: str | None = None
+    github_api_key: str | None = None
+    github_model: str | None = None
+    openrouter_api_key: str | None = None
+    openrouter_model: str | None = None
+    openai_api_key: str | None = None
+    openai_model: str | None = None
+
     ans_base_url: str = ""
     ans_api_key: str = ""
     ans_api_secret: str = ""
 
-    # Databricks (P3)
     databricks_host: str = ""
     databricks_token: str = ""
     databricks_warehouse_id: str = ""
@@ -39,18 +53,16 @@ class Settings(BaseSettings):
         return ROOT / self.database_path
 
     @property
+    def live_agents_enabled(self) -> bool:
+        return all(
+            vendor != "none"
+            for vendor in (self.backend_provider, self.frontend_provider, self.qa_provider)
+        )
+
+    @property
     def live_integrations(self) -> bool:
         return (
             self.identity_mode != "mock"
             or self.memory_mode != "cache"
-            or (self.agent_provider == "gemini" and any(self.gemini_agent_api_keys.values()))
+            or self.live_agents_enabled
         )
-
-    @property
-    def gemini_agent_api_keys(self) -> dict[str, str | None]:
-        """Use role-specific keys, with the legacy shared key as a local fallback."""
-        return {
-            "backend": self.gemini_backend_api_key or self.gemini_api_key,
-            "frontend": self.gemini_frontend_api_key or self.gemini_api_key,
-            "integration": self.gemini_integration_api_key or self.gemini_api_key,
-        }

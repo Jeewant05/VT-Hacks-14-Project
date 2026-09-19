@@ -2,7 +2,7 @@
 
 ## Live three-agent Gemini demo
 
-1. Copy `.env.example` to `.env`, set `AGENT_PROVIDER=gemini` and the three role-specific Gemini keys, then run `npm run setup` and `npm run dev`.
+1. Copy `.env.example` to `.env`, set all three provider values to `gemini` and add the three role-specific Gemini keys, then run `npm run setup` and `npm run dev`.
 2. Open the live dashboard, enter a small full-stack objective, and start the agents.
 3. Watch all three agents publish an intention. Explain that these plans are injected into every implementation prompt before any file is written.
 4. Point out that backend and frontend then build concurrently using separate APIs, exclusive directory ownership, and one shared contract.

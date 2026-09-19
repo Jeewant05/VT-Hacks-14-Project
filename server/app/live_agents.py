@@ -6,11 +6,9 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, Protocol
+from typing import Any
 
-
-class TextProvider(Protocol):
-    async def generate(self, prompt: str) -> str: ...
+from server.app.providers import Provider
 
 
 @dataclass(frozen=True)
@@ -63,7 +61,7 @@ class LiveRun:
     run_id: str
     objective: str
     root: Path
-    providers: dict[str, TextProvider]
+    providers: dict[str, Provider]
     events: list[dict[str, Any]] = field(default_factory=list)
     artifacts: list[Artifact] = field(default_factory=list)
     intentions: dict[str, str] = field(default_factory=dict)
@@ -265,7 +263,7 @@ absolute paths, parent-directory traversal, or files outside your assigned direc
 
 
 class LiveRuns:
-    def __init__(self, providers: dict[str, TextProvider], root: Path):
+    def __init__(self, providers: dict[str, Provider], root: Path):
         self.providers, self.root = providers, root
         self.runs: dict[str, LiveRun] = {}
 

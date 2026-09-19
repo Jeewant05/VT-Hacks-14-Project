@@ -6,6 +6,7 @@ from server.app.config import Settings
 from server.app.live_agents import LiveRuns
 from server.app.live_routes import build_live_router
 from server.app.models import Health, WorkspaceState
+from server.app.providers import build_agent_providers
 from server.app.routes import build_router
 from server.app.service import Coordinator
 from server.app.store import read_state
@@ -19,7 +20,7 @@ def _fresh_state() -> WorkspaceState:
 
 def build_identity(settings: Settings) -> IdentityAdapter:
     if settings.identity_mode == "ans":
-        from server.app.identity_ans import AnsIdentity  # P4 owns this file
+        from server.app.identity_ans import AnsIdentity
 
         return AnsIdentity(settings)
     return MockIdentity()
@@ -28,7 +29,7 @@ def build_identity(settings: Settings) -> IdentityAdapter:
 def build_memory(settings: Settings) -> MemoryAdapter:
     seeded = read_state(settings.resolved_database_path).decisions
     if settings.memory_mode == "databricks":
-        from server.app.memory_databricks import DatabricksMemory  # P3 owns this file
+        from server.app.memory_databricks import DatabricksMemory
 
         return DatabricksMemory(settings, fallback=CacheMemory(seeded))
     return CacheMemory(seeded)
@@ -36,7 +37,7 @@ def build_memory(settings: Settings) -> MemoryAdapter:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
-    app = FastAPI(title="Synapse API", version="0.4.0")
+    app = FastAPI(title="Synapse API", version="0.6.0")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins.split(","),
@@ -60,15 +61,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return read_state(settings.resolved_database_path)
 
     app.include_router(build_router(coordinator, _fresh_state))
-    providers = {}
-    if settings.agent_provider == "gemini":
-        from server.app.gemini import GeminiProvider
-
-        providers = {
-            role: GeminiProvider(settings, key)
-            for role, key in settings.gemini_agent_api_keys.items()
-            if key
-        }
+    configured = build_agent_providers(settings)
+    providers = {
+        role: configured[source]
+        for role, source in {
+            "backend": "backend",
+            "frontend": "frontend",
+            "integration": "qa",
+        }.items()
+        if source in configured
+    }
     runs = LiveRuns(providers, settings.resolved_database_path.parent / "live-runs")
     app.include_router(build_live_router(runs, settings.gemini_model))
     return app

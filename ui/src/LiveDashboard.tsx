@@ -80,7 +80,7 @@ export function LiveDashboard({ onSimulation }: Props) {
       <div className="prompt-heading"><div><label htmlFor="objective">Project objective</label><small>{config ? `${config.model} · ${config.configured ? 'ready' : 'setup required'}` : 'Checking configuration…'}</small></div>{run && <span className={`run-status status-${run.status}`}>{run.status}</span>}</div>
       <textarea id="objective" value={objective} maxLength={2000} onChange={event => setObjective(event.target.value)} disabled={busy || !!run} />
       <div className="prompt-actions"><button className="primary" onClick={start} disabled={busy || !!run || !config?.configured}>{busy ? 'Starting…' : 'Start three Gemini agents'}</button>{run && <button className="secondary" onClick={reset} disabled={run.status === 'planning' || run.status === 'building'}>New run</button>}<span>Generated code stays in an isolated local run directory.</span></div>
-      {config && !config.configured && <div className="setup-note"><strong>Three Gemini APIs needed.</strong> Set <code>AGENT_PROVIDER=gemini</code> plus <code>GEMINI_BACKEND_API_KEY</code>, <code>GEMINI_FRONTEND_API_KEY</code>, and <code>GEMINI_INTEGRATION_API_KEY</code> in <code>.env</code>, then restart the API.</div>}
+      {config && !config.configured && <div className="setup-note"><strong>Three agent APIs needed.</strong> Set <code>BACKEND_PROVIDER</code>, <code>FRONTEND_PROVIDER</code>, and <code>QA_PROVIDER</code>, plus the matching API keys in <code>.env</code>, then restart the API.</div>}
     </section>
 
     {error && <div className="error-card"><strong>Live run error</strong><pre>{error}</pre></div>}
