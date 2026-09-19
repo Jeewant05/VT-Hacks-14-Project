@@ -1,24 +1,26 @@
-# Agent clients
+# Gemini live-agent mode
 
-This directory contains deterministic scripted clients for testing the coordinator's
-public HTTP API. They are not autonomous agents and do not bypass the coordinator.
+The repository now includes a server-side Gemini foundation. It is intentionally
+opt-in and does not expose the API key to the browser.
 
-## Run the agent smoke test
+## Configure locally
 
-Start a seeded server in another terminal:
+Copy `.env.example` to `.env`, then set:
 
-```sh
-npm run seed
-npm run dev:server
+```dotenv
+AGENT_PROVIDER=gemini
+GEMINI_API_KEY=your_key_from_aistudio
+GEMINI_MODEL=gemini-2.5-flash
 ```
 
-Then run:
+Do not commit `.env` or the API key. Gemini API usage may have quotas or charges
+separate from a Google One/Pro subscription.
 
-```sh
-uv run python -m agents.test_agents
-```
+The provider is in `server/app/gemini.py`, and the coordinated three-role runner
+is in `server/app/live_agents.py`. The runner uses one shared
+`shared/api-contract.json` file and records versioned events rather than allowing
+agents to overwrite one another. The next UI integration should stream those
+`AgentEvent` objects over Server-Sent Events or WebSockets.
 
-The test verifies that both fixture agents can join and claim work, incompatible
-contracts open a conflict and reject a changeset with HTTP 409, and a compatible
-re-declaration lets both changesets complete the objective. Use `--base-url` to
-point at another API instance.
+The existing `npm run agent-test` remains the offline coordinator smoke test. It
+does not call Gemini and does not incur API usage.

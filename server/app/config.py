@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     memory_mode: Literal["cache"] = "cache"
     database_path: Path = Path(".local/synapse.db")
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    agent_provider: Literal["none", "gemini"] = "none"
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
 
     @property
     def resolved_database_path(self) -> Path:
