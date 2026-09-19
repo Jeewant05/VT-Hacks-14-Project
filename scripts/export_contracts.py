@@ -5,7 +5,7 @@ from pydantic import TypeAdapter
 from scripts.database import demo_state
 from server.app.config import ROOT
 from server.app.main import app
-from server.app.models import VerificationResult, WorkspaceState, WriteReceipt
+from server.app.models import OrchestrationState, VerificationResult, WorkspaceState, WriteReceipt
 
 
 def main() -> None:
@@ -14,7 +14,7 @@ def main() -> None:
     documents = {
         "openapi.json": app.openapi(),
         "schema.json": TypeAdapter(
-            WorkspaceState | VerificationResult | WriteReceipt
+            WorkspaceState | OrchestrationState | VerificationResult | WriteReceipt
         ).json_schema(),
         "example-state.json": demo_state().model_dump(mode="json"),
     }

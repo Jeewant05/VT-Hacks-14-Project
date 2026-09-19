@@ -13,7 +13,7 @@ from server.app.store import write_state
 def test_health_and_seeded_state(tmp_path):
     path = tmp_path / "test.db"
     write_state(path, demo_state())
-    client = TestClient(create_app(Settings(database_path=path)))
+    client = TestClient(create_app(Settings(database_path=path, trace_mode="cache")))
     health = client.get("/health").json()
     assert health["live_integrations"] is False
     assert health["trace_mode"] == "cache"
@@ -26,7 +26,7 @@ def test_health_and_seeded_state(tmp_path):
 def test_coordinator_events_are_available_from_trace_api(tmp_path):
     path = tmp_path / "test.db"
     write_state(path, demo_state())
-    client = TestClient(create_app(Settings(database_path=path)))
+    client = TestClient(create_app(Settings(database_path=path, trace_mode="cache")))
 
     assert client.post("/agents/backend-agent/join").status_code == 200
     traces = client.get("/traces").json()

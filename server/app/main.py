@@ -6,6 +6,8 @@ from server.app.config import Settings
 from server.app.live_agents import LiveRuns
 from server.app.live_routes import build_live_router
 from server.app.models import Health, WorkspaceState
+from server.app.orchestration import OrchestrationKernel
+from server.app.orchestration_routes import build_orchestration_router
 from server.app.routes import build_router
 from server.app.service import Coordinator
 from server.app.store import read_state
@@ -37,6 +39,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(build_router(coordinator, _fresh_state))
     app.include_router(build_trace_router(trace))
+    app.include_router(build_orchestration_router(OrchestrationKernel(settings.resolved_database_path, identity, trace)))
     if settings.agent_provider == "gemini" and settings.gemini_api_key:
         from server.app.gemini import GeminiProvider
         app.include_router(build_live_router(LiveRuns(GeminiProvider(settings), settings.resolved_database_path.parent / "live-runs", trace)))
