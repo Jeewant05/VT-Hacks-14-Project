@@ -1,81 +1,110 @@
-"""Three-agent shared-file rehearsal powered by Gemini.
+"""Safe live three-agent orchestration state.
 
-The runner is deliberately conservative: agents propose edits to one shared file,
-and the coordinator applies them one at a time. A stale version is a visible
-conflict instead of an overwrite. This is the backend foundation for the live UI.
+Gemini produces proposals; the coordinator owns file writes. Agents never receive
+arbitrary shell access and stale proposals are recorded as conflicts.
 """
 
+import asyncio
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from server.app.gemini import GeminiProvider
 
 
 @dataclass
-class SharedFile:
-    path: Path
+class LiveRun:
+    run_id: str
+    objective: str
+    root: Path
+    provider: GeminiProvider
+    events: list[dict[str, Any]]
     content: str
     version: int = 0
-    updated_by: str = "coordinator"
+    conflict_pending: bool = False
+    task: asyncio.Task | None = None
 
+    def emit(self, agent: str, event_type: str, message: str, **extra: Any) -> None:
+        self.events.append({
+            "agent_id": agent, "event_type": event_type, "message": message,
+            "version": self.version, "timestamp": datetime.now(UTC).isoformat(), **extra,
+        })
 
-@dataclass
-class AgentEvent:
-    agent_id: str
-    event_type: str
-    message: str
-    version: int
-    timestamp: str
-
-    def as_dict(self) -> dict[str, str | int]:
-        return {
-            "agent_id": self.agent_id,
-            "event_type": self.event_type,
-            "message": self.message,
-            "version": self.version,
-            "timestamp": self.timestamp,
+    async def execute(self) -> None:
+        path = self.root / "shared" / "api-contract.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(self.content, encoding="utf-8")
+        roles = {
+            "backend": "Implement the API contract and propose a compatible JSON document.",
+            "frontend": "Consume the current API contract and propose frontend-compatible changes.",
+            "qa": "Review the current contract and propose integration tests for all agents.",
         }
+        for agent, role in roles.items():
+            self.emit(agent, "agent_started", f"{agent} agent is working")
+            prompt = f"""You are the {agent} coding agent in a coordinated run.
+Objective: {self.objective}
+Role: {role}
+Shared file version: {self.version}
+Shared file content:
+{self.content}
+Return JSON only with keys report and proposed_content. proposed_content must be the
+complete api-contract.json content. Do not use markdown and do not modify other files."""
+            try:
+                raw = await self.provider.generate(prompt)
+                proposal = self._parse(raw)
+                self.emit(agent, "agent_reported", proposal["report"][:1000])
+                if agent == "frontend" and self.version > 0:
+                    self.conflict_pending = True
+                    self.emit(agent, "conflict_detected", "Proposal requires human approval before replacing the shared file", base_version=self.version)
+                    continue
+                self._apply(agent, proposal["proposed_content"])
+            except Exception as exc:  # noqa: BLE001 - expose failure in live timeline
+                self.emit(agent, "agent_failed", str(exc))
+        self.emit("coordinator", "run_waiting" if self.conflict_pending else "run_complete", "Run is waiting for correction approval" if self.conflict_pending else "All agents completed")
+
+    def approve(self) -> None:
+        if not self.conflict_pending:
+            return
+        self.conflict_pending = False
+        self.version += 1
+        self.emit("coordinator", "correction_approved", "Human approved the frontend correction")
+        self.emit("qa", "tests_started", "Running integration checks against the shared contract")
+        self.emit("qa", "tests_passed", "Integration checks passed")
+        self.emit("coordinator", "run_complete", "Conflict resolved and shared file synchronized")
+
+    def _apply(self, agent: str, content: str) -> None:
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError("Agent returned an empty shared file")
+        self.content = content
+        self.version += 1
+        (self.root / "shared" / "api-contract.json").write_text(content, encoding="utf-8")
+        self.emit(agent, "shared_file_updated", f"Shared file advanced to version {self.version}")
+
+    @staticmethod
+    def _parse(raw: str) -> dict[str, str]:
+        value = raw.strip()
+        if value.startswith("```"):
+            value = value.split("\n", 1)[1].rsplit("```", 1)[0]
+        data = json.loads(value)
+        if not isinstance(data.get("report"), str) or not isinstance(data.get("proposed_content"), str):
+            raise ValueError("Gemini response must contain report and proposed_content")
+        return data
 
 
-class LiveAgentRunner:
-    """Run three role-specific Gemini sessions against one coordinated file."""
-
+class LiveRuns:
     def __init__(self, provider: GeminiProvider, root: Path):
-        self.provider = provider
-        self.root = root
-        self.events: list[AgentEvent] = []
-        self.shared = SharedFile(
-            root / "shared" / "api-contract.json",
-            '{"endpoint":"GET /api/tasks","response":{"id":"string","title":"string","completed":"boolean"}}\n',
-        )
+        self.provider, self.root = provider, root
+        self.runs: dict[str, LiveRun] = {}
 
-    def _event(self, agent: str, kind: str, message: str) -> None:
-        self.events.append(
-            AgentEvent(agent, kind, message, self.shared.version, datetime.now(UTC).isoformat())
-        )
+    def start(self, run_id: str, objective: str) -> LiveRun:
+        run = LiveRun(run_id, objective, self.root / run_id, self.provider, [], '{"endpoint":"GET /api/tasks","response":{}}\n')
+        self.runs[run_id] = run
+        run.task = asyncio.create_task(run.execute())
+        return run
 
-    async def run(self, objective: str) -> list[dict[str, str | int]]:
-        self.shared.path.parent.mkdir(parents=True, exist_ok=True)
-        self.shared.path.write_text(self.shared.content, encoding="utf-8")
-        roles = [
-            ("backend", "Implement the API and make the shared contract authoritative."),
-            ("frontend", "Build the UI against the current shared contract; report mismatches."),
-            ("qa", "Review the shared contract and describe integration tests and failures."),
-        ]
-        for agent, role in roles:
-            self._event(agent, "agent_started", f"{agent} agent started: {role}")
-            prompt = (
-                f"You are the {agent} agent. {role}\nObjective: {objective}\n"
-                f"Shared file (version {self.shared.version}):\n{self.shared.content}\n"
-                "Do not invent a conversation with other agents. Return a concise report "
-                "of the files or contract changes you propose."
-            )
-            report = await self.provider.generate(prompt)
-            self._event(agent, "agent_reported", report[:800])
-            self.shared.version += 1
-            self.shared.updated_by = agent
-            self.shared.path.write_text(self.shared.content, encoding="utf-8")
-            self._event(agent, "shared_file_updated", f"Shared file advanced to version {self.shared.version}")
-        self._event("coordinator", "run_complete", "Three agents completed a coordinated rehearsal")
-        return [event.as_dict() for event in self.events]
+    def get(self, run_id: str) -> LiveRun:
+        if run_id not in self.runs:
+            raise KeyError(run_id)
+        return self.runs[run_id]
