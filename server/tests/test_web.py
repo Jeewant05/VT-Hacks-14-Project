@@ -6,6 +6,8 @@ mode an external verifier looks for -- so it is worth a test rather than a
 convention.
 """
 
+import json
+
 from fastapi.testclient import TestClient
 
 from scripts.database import ANS_VERSION, ans_name_for
@@ -68,11 +70,12 @@ def test_every_api_route_lives_under_api(tmp_path):
     almost nothing and the check passes no matter what is mounted.
     """
     app = create_app(Settings(demo_token=None, database_path=tmp_path / "routes.db", ans_domain=DOMAIN))
-    allowed = {"/.well-known/agent-card.json"}
+    # /.well-known/* is fixed by external specs -- the ANS agent card and the
+    # ACME HTTP-01 challenge path -- so it cannot live under /api.
     stray = [
         path
         for path in app.openapi()["paths"]
-        if not path.startswith("/api") and path not in allowed
+        if not path.startswith("/api") and not path.startswith("/.well-known/")
     ]
     assert not stray, f"routes outside /api will 404 from the dashboard: {stray}"
 
@@ -91,3 +94,37 @@ def test_the_declared_ans_endpoint_answers(tmp_path):
         r = c.get("/api", headers={"Host": host})
         assert r.status_code == 200, host
         assert r.json()["ansName"] == f"ans://v{ANS_VERSION}.{host}"
+
+
+# --- ACME HTTP-01 responder -------------------------------------------------
+
+
+def test_acme_challenge_is_served_when_configured(tmp_path):
+    """The token is base64 and contains '/', so it spans several URL segments."""
+    token = "wl6tGSamNFoaXjw/KtXtFFtesYnCVkWHFr5es9kA4as="
+    key_auth = f"{token}.thumbprint"
+    app = create_app(Settings(
+        demo_token=None, database_path=tmp_path / "acme.db", ans_domain=DOMAIN,
+        acme_challenges=json.dumps({token: key_auth}),
+    ))
+    r = TestClient(app).get(f"/.well-known/acme-challenge/{token}")
+    assert r.status_code == 200
+    assert r.text == key_auth
+
+
+def test_unknown_acme_token_is_not_found(tmp_path):
+    app = create_app(Settings(
+        demo_token=None, database_path=tmp_path / "acme.db", ans_domain=DOMAIN,
+        acme_challenges='{"real": "real.thumb"}',
+    ))
+    assert TestClient(app).get("/.well-known/acme-challenge/made-up").status_code == 404
+
+
+def test_malformed_acme_config_does_not_break_startup(tmp_path):
+    """A bad secret must not take the whole site down."""
+    for raw in ["not json", "[]", "", None]:
+        app = create_app(Settings(
+            demo_token=None, database_path=tmp_path / "acme.db", ans_domain=DOMAIN,
+            acme_challenges=raw,
+        ))
+        assert TestClient(app).get("/api/health").status_code == 200

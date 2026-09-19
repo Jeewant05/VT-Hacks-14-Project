@@ -62,6 +62,8 @@ class Settings(BaseSettings):
     # transparency-log badge is the only trust anchor. Populate from
     # `ans-cli get-identity-certs <agentId>` once an agent is ACTIVE.
     ans_identity_ca_bundle: str | None = None
+    # ANS HTTP-01 domain validation: {"<token>": "<keyAuthorization>"} as JSON.
+    acme_challenges: str | None = None
 
     databricks_host: str = ""
     databricks_token: str = ""

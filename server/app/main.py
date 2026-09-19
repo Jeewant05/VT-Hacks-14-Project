@@ -1,6 +1,9 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from server.app.acme import build_acme_router, parse_challenges
 from server.app.adapters import CacheMemory, IdentityAdapter, MemoryAdapter, MockIdentity
 from server.app.config import Settings
 from server.app.demo_runner import (
@@ -19,6 +22,8 @@ from server.app.service import Coordinator
 from server.app.store import read_state
 from server.app.trace_routes import build_trace_router
 from server.app.tracing import build_trace_sink
+
+log = logging.getLogger("synapse")
 from server.app.web import build_web_router, mount_ui
 
 
@@ -123,6 +128,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(
         build_demo_router(settings, settings.demo_token, local_base=settings.local_base_url)
     )
+    # ANS domain validation answers here instead of via DNS TXT records.
+    challenges = parse_challenges(settings.acme_challenges)
+    if challenges:
+        log.info("serving %d ACME challenge(s)", len(challenges))
+    app.include_router(build_acme_router(challenges))
     app.include_router(build_web_router(settings))
     # Mounted last so every /api route still matches first.
     mount_ui(app)
