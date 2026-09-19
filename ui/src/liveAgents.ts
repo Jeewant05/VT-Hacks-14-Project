@@ -18,7 +18,14 @@ export type LiveSnapshot = {
 export type LiveConfig = {
   configured: boolean;
   model: string;
-  roles: { id: string; title: string; responsibility: string; configured: boolean }[];
+  roles: {
+    id: string;
+    title: string;
+    responsibility: string;
+    configured: boolean;
+    provider: string | null;
+    model: string | null;
+  }[];
 };
 
 async function json<T>(response: Response): Promise<T> {

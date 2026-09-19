@@ -29,20 +29,21 @@ In that mode the dashboard is driven by the server-side runner, because a browse
 hold agent identity keys.
 
 
-## Live Gemini coding demo
+## Live open-model coding demo
 
-To run the live demo, add these values to `.env` before starting the app:
+Create a fine-grained Hugging Face token with **Make calls to Inference Providers** permission, then add it to `.env`:
 
 ```sh
-BACKEND_PROVIDER=gemini
-FRONTEND_PROVIDER=gemini
-QA_PROVIDER=gemini
-GEMINI_API_KEY_BACKEND=your-backend-key
-GEMINI_API_KEY_FRONTEND=your-frontend-key
-GEMINI_API_KEY_QA=your-integration-key
+BACKEND_PROVIDER=huggingface
+FRONTEND_PROVIDER=huggingface
+QA_PROVIDER=huggingface
+HF_TOKEN=hf_your_token
+HUGGINGFACE_MODEL=openai/gpt-oss-120b:fastest
 ```
 
-Each role has its own provider and API key so calls can run independently. First, all three agents generate an intention in parallel. The coordinator shares those intentions with every agent, then starts implementation: backend and frontend build concurrently, and integration reviews their staged output. Nothing is written until every proposal passes ownership, path, duplicate, and size validation. The legacy `GEMINI_API_KEY` remains available as a single-key fallback, but separate keys are recommended for the concurrent demo.
+Hugging Face's Inference Providers router uses one token and can select the fastest available host for an open model. Set `HUGGINGFACE_MODEL_BACKEND`, `_FRONTEND`, and `_QA` if you want a different open model for each role; otherwise all three use `HUGGINGFACE_MODEL`. Provider-side account limits can still apply, so transient 429 and 5xx responses are retried with bounded backoff.
+
+First, all three agents generate an intention in parallel. The coordinator shares those intentions with every agent, then starts implementation: backend and frontend build concurrently, and integration reviews their staged output. Nothing is written until every proposal passes ownership, path, duplicate, and size validation.
 
 Every proposed path is checked against its role (`backend/**`, `frontend/**`, or `integration/**`) before the coordinator writes it under `.local/live-runs/<run-id>`; generated code never edits the Synapse repository and is not executed automatically.
 
@@ -74,7 +75,7 @@ The database defaults to `.local/synapse.db`. Reset touches only local workspace
 | `server/` | API, models, SQLite, coordinator and integration interfaces | P1; P3/P4 implement their adapters |
 | `ui/` | React/TypeScript dashboard | P2 |
 | `agents/` | Scripted coordinator clients and smoke checks | P2 with P1 |
-| `.local/live-runs/` | Ignored, isolated output from live Gemini runs | Coordinator |
+| `.local/live-runs/` | Ignored, isolated output from live agent runs | Coordinator |
 | `contracts/` | Generated schemas and sample state | P1 approves interface changes |
 | `scripts/` | Setup support, contracts, seed/reset, smoke check | P1 |
 | `docs/` | Scope, ownership, demo instructions | All |
