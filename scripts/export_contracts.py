@@ -20,6 +20,15 @@ def main() -> None:
     }
     for name, document in documents.items():
         (directory / name).write_text(json.dumps(document, indent=2) + "\n")
+    frozen_orchestration = directory / "orchestration-api-v1.json"
+    if not frozen_orchestration.exists():
+        orchestration_paths = {
+            path: operation for path, operation in app.openapi()["paths"].items()
+            if path.startswith("/api/")
+        }
+        frozen_orchestration.write_text(
+            json.dumps({"version": "v1", "paths": orchestration_paths}, indent=2) + "\n"
+        )
     print("Exported API, shared model schemas, and fixture payloads.")
 
 

@@ -67,4 +67,6 @@ The coordinator exposes health/state reads plus agent join, workstream claim, co
 
 The stricter orchestration API lives under `/api`. It registers three codebase demo agents, requires a structured Intention Document before execution, blocks deterministic file/symbol/contract/dependency/permission conflicts, validates submitted ChangeSets against their approved intention, and records the workflow through the configured trace sink. See [the three-agent workflow](agents/README.md#three-agent-orchestration-demo).
 
+The checked-in [orchestration v1 contract](/Users/amanjeetsahagal/Documents/VTHACKS/VT-Hacks-14-Project/contracts/orchestration-api-v1.json) is frozen for frontend work. The verification suite rejects changes to its `/api` operations or response schemas. Additive API work belongs in a new versioned endpoint or a deliberate v2 contract update.
+
 See [scope and team handoff](docs/SETUP.md) and [demo runbook](docs/DEMO.md). Keep secrets in ignored `.env`; never commit credentials, keys, or local database files.
