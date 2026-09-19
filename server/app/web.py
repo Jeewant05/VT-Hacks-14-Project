@@ -45,12 +45,15 @@ def build_web_router(settings: Settings) -> APIRouter:
 
     @router.get("/.well-known/agent-card.json")
     def agent_card(request: Request) -> JSONResponse:
-        from scripts.database import ans_name_for
+        from scripts.database import ANS_VERSION
 
-        (agent_id, name, description), hostname = _agent_for_host(
+        (_agent_id, name, description), hostname = _agent_for_host(
             request.headers.get("host", ""), settings.ans_domain
         )
-        ans_name = ans_name_for(agent_id, settings.ans_domain) if settings.ans_domain else None
+        # Derived from the host actually requested, not from a lookup table: a
+        # card served at host X can then only claim ans://vN.X. The registration
+        # for that host is the same name, so the two cannot drift.
+        ans_name = f"ans://v{ANS_VERSION}.{hostname}" if hostname else None
         return JSONResponse({
             "name": name,
             "description": description,

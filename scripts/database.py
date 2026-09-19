@@ -14,10 +14,13 @@ from server.app.store import read_state, write_state
 
 # One ANS host per agent: an ANSName is host + version, so two agents cannot
 # share a host. `coordinator` sits on the apex.
+# agent id -> subdomain label. "" means the zone apex. Must match AGENTS in
+# scripts/ans_register.py, or the seeded ANSName will not be the registered one.
 AGENT_HOSTS = {
     "backend-agent": "backend",
     "frontend-agent": "frontend",
     "telemetry-agent": "telemetry",
+    "coordinator": "",
 }
 ANS_VERSION = "1.0.0"
 ANS_MATERIAL_ROOT = ROOT / ".local" / "ans"
@@ -40,9 +43,11 @@ def ans_name_for(agent_id: str, domain: str | None) -> str:
                 return name
         except (OSError, ValueError):
             pass
+    label = AGENT_HOSTS.get(agent_id, agent_id)
     if not domain:
-        return f"{AGENT_HOSTS.get(agent_id, agent_id)}.unregistered.invalid"
-    return f"ans://v{ANS_VERSION}.{AGENT_HOSTS.get(agent_id, agent_id)}.{domain}"
+        return f"{label or agent_id}.unregistered.invalid"
+    host = f"{label}.{domain}" if label else domain
+    return f"ans://v{ANS_VERSION}.{host}"
 
 
 def demo_state(domain: str | None = None) -> WorkspaceState:
