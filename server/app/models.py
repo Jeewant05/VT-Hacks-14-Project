@@ -51,9 +51,15 @@ class Workstream(BaseModel):
 
 class AgentPrincipal(BaseModel):
     id: str
+    # Canonical ANSName: ans://v<major.minor.patch>.<agentHost>. In mock mode this is
+    # a placeholder label; in ANS mode it must resolve. See server/app/ans/names.py.
     ans_name: str
     role: str
     verified: bool = False
+    # Populated by ANS registration; absent in mock mode.
+    ans_agent_id: str | None = None
+    identity_cert_fingerprint: str | None = None
+    ans_status: str | None = None
 
 
 class Conflict(BaseModel):
@@ -91,6 +97,9 @@ class VerificationResult(BaseModel):
     source: Literal["ans", "mock"]
     evidence: str
     checked_at: str
+    # ANS-6 verification tier actually performed, and the badge state it saw.
+    tier: Literal["badge", "scitt", "none"] = "none"
+    badge_status: str | None = None
 
 
 class WriteReceipt(BaseModel):
@@ -104,6 +113,9 @@ class Health(BaseModel):
     identity_mode: str
     memory_mode: str
     live_integrations: bool = False
+    # ANS mode only: what the coordinator actually verifies, for the integrations panel.
+    identity_tier: Literal["badge", "scitt", "none"] = "none"
+    dpop_required: bool = False
 
 
 class WorkspaceState(BaseModel):

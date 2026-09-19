@@ -1,6 +1,7 @@
 import argparse
+import json
 
-from server.app.config import Settings
+from server.app.config import ROOT, Settings
 from server.app.models import (
     AgentPrincipal,
     ApiContract,
@@ -11,8 +12,40 @@ from server.app.models import (
 )
 from server.app.store import read_state, write_state
 
+# One ANS host per agent: an ANSName is host + version, so two agents cannot
+# share a host. `coordinator` sits on the apex.
+AGENT_HOSTS = {
+    "backend-agent": "backend",
+    "frontend-agent": "frontend",
+    "telemetry-agent": "telemetry",
+}
+ANS_VERSION = "1.0.0"
+ANS_MATERIAL_ROOT = ROOT / ".local" / "ans"
 
-def demo_state() -> WorkspaceState:
+
+def ans_name_for(agent_id: str, domain: str | None) -> str:
+    """The agent's ANSName.
+
+    Prefers what `ans-cli` actually registered (recorded in .local/ans/<agent>/
+    agent.json by scripts/ans_register.sh) so the fixture cannot drift from the
+    registry. Falls back to the deterministic name for ANS_DOMAIN, and finally to
+    a clearly-labelled placeholder when no domain is configured at all -- mock
+    mode must keep working on a fresh clone with no credentials.
+    """
+    recorded = ANS_MATERIAL_ROOT / agent_id / "agent.json"
+    if recorded.is_file():
+        try:
+            name = json.loads(recorded.read_text()).get("ansName")
+            if name:
+                return name
+        except (OSError, ValueError):
+            pass
+    if not domain:
+        return f"{AGENT_HOSTS.get(agent_id, agent_id)}.unregistered.invalid"
+    return f"ans://v{ANS_VERSION}.{AGENT_HOSTS.get(agent_id, agent_id)}.{domain}"
+
+
+def demo_state(domain: str | None = None) -> WorkspaceState:
     return WorkspaceState(
         objective=Objective(
             id="oauth-objective",
@@ -25,9 +58,19 @@ def demo_state() -> WorkspaceState:
             ],
         ),
         agents=[
-            AgentPrincipal(id="backend-agent", ans_name="backend.demo", role="backend"),
-            AgentPrincipal(id="frontend-agent", ans_name="frontend.demo", role="frontend"),
-            AgentPrincipal(id="telemetry-agent", ans_name="telemetry.demo", role="telemetry"),
+            AgentPrincipal(
+                id="backend-agent", ans_name=ans_name_for("backend-agent", domain), role="backend"
+            ),
+            AgentPrincipal(
+                id="frontend-agent",
+                ans_name=ans_name_for("frontend-agent", domain),
+                role="frontend",
+            ),
+            AgentPrincipal(
+                id="telemetry-agent",
+                ans_name=ans_name_for("telemetry-agent", domain),
+                role="telemetry",
+            ),
         ],
         workstreams=[
             Workstream(
@@ -102,11 +145,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Manage local demo fixtures only.")
     parser.add_argument("action", choices=["seed", "reset"])
     args = parser.parse_args()
-    path = Settings().resolved_database_path
+    settings = Settings()
+    path = settings.resolved_database_path
     if args.action == "seed" and read_state(path).objective:
         print("Local workspace already seeded; left unchanged.")
         return
-    write_state(path, demo_state())
+    write_state(path, demo_state(settings.ans_domain))
     print(f"Local workspace {args.action} complete: {path}. No external data changed.")
 
 

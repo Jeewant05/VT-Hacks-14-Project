@@ -70,6 +70,32 @@ class Coordinator:
                 return ws
         raise NotFound(f"workstream {ws_id}")
 
+    @staticmethod
+    def _bind(state: WorkspaceState, agent_id: str, proven_ans_name: str | None) -> None:
+        """Tie the proven ANS identity to the agent_id the caller claims.
+
+        `proven_ans_name` comes from the identity certificate the caller proved
+        possession of, so this is what stops one registered agent from acting as
+        another -- and what stops an unregistered caller from naming any agent at
+        all. In mock mode it is None and this is a no-op.
+        """
+        if proven_ans_name is None:
+            return
+        agent = next((a for a in state.agents if a.id == agent_id), None)
+        if agent is None:
+            raise Forbidden(f"{proven_ans_name} is not bound to any known agent")
+        if agent.ans_name.strip().lower() != proven_ans_name.strip().lower():
+            raise Forbidden(
+                f"caller proved {proven_ans_name} but claimed {agent_id}, which is "
+                f"registered as {agent.ans_name}"
+            )
+
+    @staticmethod
+    def _require_verified(state: WorkspaceState, agent_id: str) -> None:
+        agent = next((a for a in state.agents if a.id == agent_id), None)
+        if agent is None or not agent.verified:
+            raise Forbidden(f"{agent_id} is not a verified agent")
+
     async def _emit(self, state: WorkspaceState, event_type: str, ws_id: str | None,
                     agent_id: str | None, payload: dict | None = None) -> Event:
         event = Event(
@@ -145,32 +171,37 @@ class Coordinator:
 
     # ---------- transitions ----------
 
-    async def join(self, agent_id: str) -> WorkspaceState:
+    async def join(self, agent_id: str, *, proven_ans_name: str | None = None) -> WorkspaceState:
         with self._lock:
             state = read_state(self.db_path)
             agent = next((a for a in state.agents if a.id == agent_id), None)
             if agent is None:
                 raise NotFound(f"agent {agent_id}")
+            self._bind(state, agent_id, proven_ans_name)
             result = await self.identity.verify(agent)
             agent.verified = result.verified
+            agent.ans_status = result.badge_status
             if not result.verified:
                 await self._emit(state, AGENT_REJECTED, None, agent_id,
-                                 {"source": result.source, "evidence": result.evidence})
+                                 {"source": result.source, "evidence": result.evidence,
+                                  "tier": result.tier, "badge_status": result.badge_status})
                 write_state(self.db_path, state)
                 raise Forbidden(result.evidence)
             await self._emit(state, AGENT_JOINED, None, agent_id,
                              {"source": result.source, "evidence": result.evidence,
-                              "ans_name": agent.ans_name})
+                              "ans_name": agent.ans_name, "tier": result.tier,
+                              "badge_status": result.badge_status})
             write_state(self.db_path, state)
             return state
 
-    async def claim(self, ws_id: str, agent_id: str) -> WorkspaceState:
+    async def claim(
+        self, ws_id: str, agent_id: str, *, proven_ans_name: str | None = None
+    ) -> WorkspaceState:
         with self._lock:
             state = read_state(self.db_path)
             ws = self._ws(state, ws_id)
-            agent = next((a for a in state.agents if a.id == agent_id), None)
-            if agent is None or not agent.verified:
-                raise Forbidden(f"{agent_id} is not a verified agent")
+            self._bind(state, agent_id, proven_ans_name)
+            self._require_verified(state, agent_id)
             if ws.agent_id != agent_id:
                 raise Forbidden(f"{ws_id} is assigned to {ws.agent_id}")
             if ws.status == "pending":
@@ -180,10 +211,19 @@ class Coordinator:
             write_state(self.db_path, state)
             return state
 
-    async def declare(self, ws_id: str, agent_id: str, contract: ApiContract) -> WorkspaceState:
+    async def declare(
+        self,
+        ws_id: str,
+        agent_id: str,
+        contract: ApiContract,
+        *,
+        proven_ans_name: str | None = None,
+    ) -> WorkspaceState:
         with self._lock:
             state = read_state(self.db_path)
             ws = self._ws(state, ws_id)
+            self._bind(state, agent_id, proven_ans_name)
+            self._require_verified(state, agent_id)
             if ws.agent_id != agent_id:
                 raise Forbidden(f"{ws_id} is assigned to {ws.agent_id}")
             ws.contract = contract
@@ -195,12 +235,19 @@ class Coordinator:
             return state
 
     async def reassign_scope(
-        self, ws_id: str, agent_id: str, owned_paths: list[str]
+        self,
+        ws_id: str,
+        agent_id: str,
+        owned_paths: list[str],
+        *,
+        proven_ans_name: str | None = None,
     ) -> WorkspaceState:
         """Apply a coordinator-approved file plan before an agent edits code."""
         with self._lock:
             state = read_state(self.db_path)
             ws = self._ws(state, ws_id)
+            self._bind(state, agent_id, proven_ans_name)
+            self._require_verified(state, agent_id)
             if ws.agent_id != agent_id:
                 raise Forbidden(f"{ws_id} is assigned to {ws.agent_id}")
             if not owned_paths:
@@ -218,12 +265,30 @@ class Coordinator:
             write_state(self.db_path, state)
             return state
 
-    async def submit(self, ws_id: str, changeset: ChangeSet) -> WorkspaceState:
+    async def submit(
+        self, ws_id: str, changeset: ChangeSet, *, proven_ans_name: str | None = None
+    ) -> WorkspaceState:
         with self._lock:
             state = read_state(self.db_path)
             ws = self._ws(state, ws_id)
+            self._bind(state, changeset.agent_id, proven_ans_name)
+            self._require_verified(state, changeset.agent_id)
             if changeset.agent_id != ws.agent_id:
                 raise Forbidden(f"{ws_id} is assigned to {ws.agent_id}")
+            # Landing a ChangeSet is the one irreversible step, so liveness is
+            # re-checked here rather than trusted from join time. An agent revoked
+            # mid-run must not be able to merge.
+            agent = next((a for a in state.agents if a.id == changeset.agent_id), None)
+            if agent is not None:
+                liveness = await self.identity.verify(agent)
+                if not liveness.verified:
+                    agent.verified = False
+                    await self._emit(state, CHANGESET_REJECTED, ws_id, changeset.agent_id,
+                                     {"changeset_id": changeset.id,
+                                      "reason": "identity is no longer live",
+                                      "evidence": liveness.evidence})
+                    write_state(self.db_path, state)
+                    raise Forbidden(f"identity is no longer live: {liveness.evidence}")
             open_conflicts = self._open_conflicts_for(state, ws_id)
             if open_conflicts:
                 await self._emit(state, CHANGESET_REJECTED, ws_id, changeset.agent_id,

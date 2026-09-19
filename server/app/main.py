@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from server.app.adapters import CacheMemory, MockIdentity
+from server.app.ans.identity import build_ans_identity
 from server.app.config import Settings
 from server.app.live_agents import LiveRuns
 from server.app.live_routes import build_live_router
@@ -11,28 +12,47 @@ from server.app.service import Coordinator
 from server.app.store import read_state
 
 
-def _fresh_state() -> WorkspaceState:
-    from scripts.database import demo_state
-    return demo_state()
+def _fresh_state_for(settings: Settings):
+    """Reset restores the fixture with the same ANSNames the seed script used."""
+    def build() -> WorkspaceState:
+        from scripts.database import demo_state
+        return demo_state(settings.ans_domain)
+
+    return build
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     app = FastAPI(title="Synapse API", version="0.3.0")
     app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins.split(","), allow_methods=["GET", "POST"], allow_headers=["*"])
-    identity = MockIdentity()
+    # The adapter follows IDENTITY_MODE; ans mode fails fast rather than silently
+    # falling back to the fixture, which would misreport the demo as verified.
+    ans_identity = build_ans_identity(settings) if settings.identity_mode == "ans" else None
+    identity = ans_identity or MockIdentity()
     memory = CacheMemory(read_state(settings.resolved_database_path).decisions)
     coordinator = Coordinator(settings.resolved_database_path, identity, memory)
 
     @app.get("/health", response_model=Health)
     def health() -> Health:
-        return Health(identity_mode=settings.identity_mode, memory_mode=settings.memory_mode)
+        return Health(
+            identity_mode=settings.identity_mode,
+            memory_mode=settings.memory_mode,
+            identity_tier="badge" if ans_identity else "none",
+            dpop_required=bool(ans_identity and settings.ans_dpop_required),
+        )
 
     @app.get("/state", response_model=WorkspaceState)
     def state() -> WorkspaceState:
         return read_state(settings.resolved_database_path)
 
-    app.include_router(build_router(coordinator, _fresh_state))
+    app.include_router(
+        build_router(
+            coordinator,
+            _fresh_state_for(settings),
+            ans_identity=ans_identity,
+            dpop_required=settings.ans_dpop_required,
+        )
+    )
     if settings.agent_provider == "gemini" and settings.gemini_api_key:
         from server.app.gemini import GeminiProvider
         app.include_router(build_live_router(LiveRuns(GeminiProvider(settings), settings.resolved_database_path.parent / "live-runs")))
