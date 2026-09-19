@@ -160,6 +160,12 @@ export interface components {
              * @default false
              */
             verified: boolean;
+            /** Ans Agent Id */
+            ans_agent_id?: string | null;
+            /** Identity Cert Fingerprint */
+            identity_cert_fingerprint?: string | null;
+            /** Ans Status */
+            ans_status?: string | null;
         };
         /** ApiContract */
         ApiContract: {
@@ -291,6 +297,17 @@ export interface components {
              * @default false
              */
             live_integrations: boolean;
+            /**
+             * Identity Tier
+             * @default none
+             * @enum {string}
+             */
+            identity_tier: "badge" | "scitt" | "none";
+            /**
+             * Dpop Required
+             * @default false
+             */
+            dpop_required: boolean;
         };
         /** Objective */
         Objective: {

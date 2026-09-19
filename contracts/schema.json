@@ -18,6 +18,42 @@
           "default": false,
           "title": "Verified",
           "type": "boolean"
+        },
+        "ans_agent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ans Agent Id"
+        },
+        "identity_cert_fingerprint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Identity Cert Fingerprint"
+        },
+        "ans_status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ans Status"
         }
       },
       "required": [
@@ -383,6 +419,28 @@
         "checked_at": {
           "title": "Checked At",
           "type": "string"
+        },
+        "tier": {
+          "default": "none",
+          "enum": [
+            "badge",
+            "scitt",
+            "none"
+          ],
+          "title": "Tier",
+          "type": "string"
+        },
+        "badge_status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Badge Status"
         }
       },
       "required": [

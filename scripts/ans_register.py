@@ -66,7 +66,7 @@ def cli_env(settings: Settings) -> dict[str, str]:
 def run(args: list[str], env: dict[str, str], capture_json: bool = False):
     printable = " ".join(a for a in args)
     print(f"  $ {printable}")
-    result = subprocess.run(args, env=env, capture_output=True, text=True)
+    result = subprocess.run(args, env=env, capture_output=True, text=True, check=False)
     if result.returncode != 0:
         print(result.stdout.strip())
         print(result.stderr.strip(), file=sys.stderr)
@@ -177,7 +177,7 @@ def step_records(agent_id: str, domain: str, env: dict[str, str]) -> None:
         if key in registration:
             print(f"    {key}: {json.dumps(registration[key], indent=6)}")
     if "_acme-challenge" in blob or "acme" in blob.lower():
-        print("    (raw registration response saved in .local/ans/%s/agent.json)" % agent_id)
+        print(f"    (raw registration response saved in .local/ans/{agent_id}/agent.json)")
 
 
 def step_acme(agent_id: str, domain: str, env: dict[str, str]) -> None:

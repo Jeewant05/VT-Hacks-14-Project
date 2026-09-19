@@ -89,21 +89,30 @@
   "agents": [
     {
       "id": "backend-agent",
-      "ans_name": "backend.demo",
+      "ans_name": "ans://v1.0.0.backend.synapse-vt.us",
       "role": "backend",
-      "verified": false
+      "verified": false,
+      "ans_agent_id": null,
+      "identity_cert_fingerprint": null,
+      "ans_status": null
     },
     {
       "id": "frontend-agent",
-      "ans_name": "frontend.demo",
+      "ans_name": "ans://v1.0.0.frontend.synapse-vt.us",
       "role": "frontend",
-      "verified": false
+      "verified": false,
+      "ans_agent_id": null,
+      "identity_cert_fingerprint": null,
+      "ans_status": null
     },
     {
       "id": "telemetry-agent",
-      "ans_name": "telemetry.demo",
+      "ans_name": "ans://v1.0.0.telemetry.synapse-vt.us",
       "role": "telemetry",
-      "verified": false
+      "verified": false,
+      "ans_agent_id": null,
+      "identity_cert_fingerprint": null,
+      "ans_status": null
     }
   ],
   "conflicts": [],

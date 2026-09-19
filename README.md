@@ -16,7 +16,11 @@ npm run dev
 
 Open http://127.0.0.1:5173. The dashboard should show **Coordinator connected**, the prepared OAuth objective, and three pending workstreams. API documentation is at http://127.0.0.1:8000/docs. Stop both services with Ctrl+C.
 
-No sponsor credentials are required for setup. `IDENTITY_MODE=mock` and `MEMORY_MODE=cache` are the only implemented modes. Mock identity results are fixtures, not ANS verification. The memory adapter is an in-process development fixture, not durable Databricks delivery. Seeded decisions are local fixtures.
+No sponsor credentials are required for setup. The default `IDENTITY_MODE=mock` uses a local allowlist: mock identity results are fixtures, not ANS verification.
+
+`IDENTITY_MODE=ans` performs real Agent Name Service verification — transparency-log badge for identity and liveness, plus an ANS-6 Method B proof of possession on every privileged call. It needs registered agents and credentials; see [docs/ANS.md](docs/ANS.md). In that mode the dashboard's guided buttons are read-only by design, because a browser cannot hold agent identity keys.
+
+`MEMORY_MODE=cache` remains the only memory mode. The memory adapter is an in-process development fixture, not durable Databricks delivery. Seeded decisions are local fixtures.
 
 ## Commands
 
@@ -30,6 +34,8 @@ No sponsor credentials are required for setup. `IDENTITY_MODE=mock` and `MEMORY_
 | `npm run reset` | Replace local workspace state with initial fixtures |
 | `npm run check` | Python lint, foundation smoke tests, TypeScript check, UI build |
 | `npm run rehearse` | Check a running, seeded API; not the final product rehearsal |
+| `npm run ans -- <step>` | Drive ANS registration (`generate`, `register`, `records`, `acme`, `dns`, `status`, `certs`) |
+| `npm run ans:check` | Resolve the seeded ANSNames and report what a verifier would decide |
 
 The database defaults to `.local/synapse.db`. Reset touches only local workspace state; it does not contact sponsor services. Do not use the local reset command against any future shared or production store.
 

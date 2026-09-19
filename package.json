@@ -18,7 +18,9 @@
     "reset": "uv run python -m scripts.database reset",
     "check": "uv run ruff check server scripts agents && uv run pytest && npm run test --workspace ui && npm run build --workspace ui",
     "rehearse": "uv run python -m scripts.rehearse",
-    "agent-test": "uv run python -m agents.test_agents"
+    "agent-test": "uv run python -m agents.test_agents",
+    "ans": "uv run python -m scripts.ans_register",
+    "ans:check": "uv run python -m scripts.ans_check"
   },
   "devDependencies": {
     "concurrently": "^9.2.0",

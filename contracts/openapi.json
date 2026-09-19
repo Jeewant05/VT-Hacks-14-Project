@@ -316,6 +316,39 @@
             "type": "boolean",
             "title": "Verified",
             "default": false
+          },
+          "ans_agent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ans Agent Id"
+          },
+          "identity_cert_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity Cert Fingerprint"
+          },
+          "ans_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ans Status"
           }
         },
         "type": "object",
@@ -642,6 +675,21 @@
           "live_integrations": {
             "type": "boolean",
             "title": "Live Integrations",
+            "default": false
+          },
+          "identity_tier": {
+            "type": "string",
+            "enum": [
+              "badge",
+              "scitt",
+              "none"
+            ],
+            "title": "Identity Tier",
+            "default": "none"
+          },
+          "dpop_required": {
+            "type": "boolean",
+            "title": "Dpop Required",
             "default": false
           }
         },
