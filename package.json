@@ -2,8 +2,12 @@
   "name": "synapse-workspace",
   "version": "0.1.0",
   "private": true,
-  "workspaces": ["ui"],
-  "engines": {"node": ">=22.12.0 <23"},
+  "workspaces": [
+    "ui"
+  ],
+  "engines": {
+    "node": ">=22.12.0 <23"
+  },
   "scripts": {
     "setup": "uv sync --locked && npm ci && npm run contracts && npm run seed",
     "dev": "concurrently --kill-others --names api,ui \"npm:dev:server\" \"npm:dev:ui\"",
@@ -12,8 +16,11 @@
     "contracts": "uv run python -m scripts.export_contracts && openapi-typescript contracts/openapi.json -o ui/src/api.generated.ts",
     "seed": "uv run python -m scripts.database seed",
     "reset": "uv run python -m scripts.database reset",
-    "check": "uv run ruff check server scripts && uv run pytest && npm run build --workspace ui",
+    "check": "uv run ruff check server scripts && uv run pytest && npm run test --workspace ui && npm run build --workspace ui",
     "rehearse": "uv run python -m scripts.rehearse"
   },
-  "devDependencies": {"concurrently": "^9.2.0", "openapi-typescript": "^7.10.0"}
+  "devDependencies": {
+    "concurrently": "^9.2.0",
+    "openapi-typescript": "^7.10.0"
+  }
 }
