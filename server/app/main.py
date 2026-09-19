@@ -72,7 +72,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if source in configured
     }
     runs = LiveRuns(providers, settings.resolved_database_path.parent / "live-runs")
-    app.include_router(build_live_router(runs, settings.gemini_model))
+    app.include_router(build_live_router(runs))
     return app
 
 

@@ -1,4 +1,4 @@
-"""Bounded three-agent Gemini coding runs with plan-before-write coordination."""
+"""Bounded three-agent coding runs with plan-before-write coordination."""
 
 import asyncio
 import json
@@ -258,7 +258,7 @@ absolute paths, parent-directory traversal, or files outside your assigned direc
             value = value.split("\n", 1)[1].rsplit("```", 1)[0]
         data = json.loads(value)
         if not isinstance(data, dict):
-            raise TypeError("Gemini response must be a JSON object")
+            raise TypeError("Agent response must be a JSON object")
         return data
 
 
@@ -278,7 +278,7 @@ class LiveRuns:
     def start(self, objective: str) -> LiveRun:
         missing = [role.id for role in ROLES if role.id not in self.providers]
         if missing:
-            raise RuntimeError(f"Missing Gemini API configuration for: {', '.join(missing)}")
+            raise RuntimeError(f"Missing agent provider configuration for: {', '.join(missing)}")
         objective = objective.strip()
         if not objective:
             raise ValueError("objective cannot be empty")
