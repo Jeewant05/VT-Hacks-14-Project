@@ -16,11 +16,39 @@ npm run dev
 
 Open http://127.0.0.1:5173. The dashboard should show **Coordinator connected**, the prepared OAuth objective, and three pending workstreams. API documentation is at http://127.0.0.1:8000/docs. Stop both services with Ctrl+C.
 
-No sponsor credentials are required for setup. The default `IDENTITY_MODE=mock` uses a local allowlist: mock identity results are fixtures, not ANS verification.
+No credentials are required for the guided simulation. The default `IDENTITY_MODE=mock`
+uses a local allowlist: mock identity results are fixtures, not ANS verification, and
+seeded decisions are local fixtures.
 
-`IDENTITY_MODE=ans` performs real Agent Name Service verification — transparency-log badge for identity and liveness, plus an ANS-6 Method B proof of possession on every privileged call. It needs registered agents and credentials; see [docs/ANS.md](docs/ANS.md). In that mode the dashboard's guided buttons are read-only by design, because a browser cannot hold agent identity keys.
+## Agent Name Service
 
-`MEMORY_MODE=cache` remains the only memory mode. The memory adapter is an in-process development fixture, not durable Databricks delivery. Seeded decisions are local fixtures.
+`IDENTITY_MODE=ans` performs real Agent Name Service verification: a transparency-log
+badge for identity and liveness, plus an ANS-6 Method B proof of possession on every
+privileged call. It needs registered agents and credentials — see [docs/ANS.md](docs/ANS.md).
+In that mode the dashboard is driven by the server-side runner, because a browser cannot
+hold agent identity keys.
+
+
+## Live Gemini coding demo
+
+To run the live demo, add these values to `.env` before starting the app:
+
+```sh
+BACKEND_PROVIDER=gemini
+FRONTEND_PROVIDER=gemini
+QA_PROVIDER=gemini
+GEMINI_API_KEY_BACKEND=your-backend-key
+GEMINI_API_KEY_FRONTEND=your-frontend-key
+GEMINI_API_KEY_QA=your-integration-key
+```
+
+Each role has its own provider and API key so calls can run independently. First, all three agents generate an intention in parallel. The coordinator shares those intentions with every agent, then starts implementation: backend and frontend build concurrently, and integration reviews their staged output. Nothing is written until every proposal passes ownership, path, duplicate, and size validation. The legacy `GEMINI_API_KEY` remains available as a single-key fallback, but separate keys are recommended for the concurrent demo.
+
+Every proposed path is checked against its role (`backend/**`, `frontend/**`, or `integration/**`) before the coordinator writes it under `.local/live-runs/<run-id>`; generated code never edits the Synapse repository and is not executed automatically.
+
+## Databricks trace layer
+
+Set `TRACE_MODE=databricks` with `DATABRICKS_HOST`, `DATABRICKS_TOKEN`, `DATABRICKS_WAREHOUSE_ID`, `DATABRICKS_CATALOG`, and `DATABRICKS_SCHEMA` to persist coordinator and live-agent events. Create the destination from [the trace schema](docs/databricks-trace-schema.sql). `GET /traces` reads the newest records; `GET /traces?run_id=run-…` filters a live run. Incomplete settings safely retain the in-process cache trace store.
 
 ## Commands
 
@@ -45,8 +73,8 @@ The database defaults to `.local/synapse.db`. Reset touches only local workspace
 | --- | --- | --- |
 | `server/` | API, models, SQLite, coordinator and integration interfaces | P1; P3/P4 implement their adapters |
 | `ui/` | React/TypeScript dashboard | P2 |
-| `agents/` | Future scripted clients and coding-agent instructions | P2 with P1 |
-| `demo-repo/` | Future small OAuth application and prepared changes | P2 |
+| `agents/` | Scripted coordinator clients and smoke checks | P2 with P1 |
+| `.local/live-runs/` | Ignored, isolated output from live Gemini runs | Coordinator |
 | `contracts/` | Generated schemas and sample state | P1 approves interface changes |
 | `scripts/` | Setup support, contracts, seed/reset, smoke check | P1 |
 | `docs/` | Scope, ownership, demo instructions | All |
@@ -54,5 +82,9 @@ The database defaults to `.local/synapse.db`. Reset touches only local workspace
 Pydantic models in `server/app/models.py` are the source of truth. Run `npm run contracts` after model or endpoint changes, and commit all generated files. Do not edit `ui/src/api.generated.ts` manually. Exact dependency resolutions are committed in `uv.lock` and `package-lock.json`; use `uv sync --locked` and `npm ci` for repeatable installs.
 
 The coordinator exposes health/state reads plus agent join, workstream claim, contract declaration, scope reassignment, ChangeSet submission, and local reset endpoints. The guided UI calls these endpoints through the Vite `/api` proxy. The official Python MCP SDK is installed, but no MCP transport or tools are exposed yet. Production hosting/proxy configuration remains outside this milestone.
+
+The stricter orchestration API lives under `/api`. It registers three codebase demo agents, requires a structured Intention Document before execution, blocks deterministic file/symbol/contract/dependency/permission conflicts, validates submitted ChangeSets against their approved intention, and records the workflow through the configured trace sink. See [the three-agent workflow](agents/README.md#three-agent-orchestration-demo).
+
+The checked-in [orchestration v1 contract](/Users/amanjeetsahagal/Documents/VTHACKS/VT-Hacks-14-Project/contracts/orchestration-api-v1.json) is frozen for frontend work. The verification suite rejects changes to its `/api` operations or response schemas. Additive API work belongs in a new versioned endpoint or a deliberate v2 contract update.
 
 See [scope and team handoff](docs/SETUP.md) and [demo runbook](docs/DEMO.md). Keep secrets in ignored `.env`; never commit credentials, keys, or local database files.

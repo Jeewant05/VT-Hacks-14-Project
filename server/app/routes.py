@@ -10,10 +10,11 @@ In mock mode the dependency is inert and the endpoints behave exactly as before.
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from server.app.ans.identity import AnsIdentity, AnsVerificationError, AuthenticatedAgent
+from server.app.ans.gate import build_authenticator, proven
+from server.app.ans.identity import AnsIdentity, AuthenticatedAgent
 from server.app.models import ApiContract, ChangeSet, WorkspaceState
 from server.app.service import Blocked, Coordinator, Forbidden, NotFound
 
@@ -39,38 +40,11 @@ def build_router(
     dpop_required: bool = True,
 ) -> APIRouter:
     router = APIRouter()
-    enforcing = ans_identity is not None and dpop_required
-
-    async def authenticate(request: Request) -> AuthenticatedAgent | None:
-        """Prove possession, identity and liveness before the coordinator mutates state."""
-        if not enforcing:
-            return None
-        proofs = request.headers.getlist("dpop")
-        if len(proofs) > 1:
-            # ANS-6: a duplicated security header is a rejection, not a choice.
-            raise HTTPException(401, "multiple DPoP headers presented")
-        if not proofs:
-            raise HTTPException(
-                401,
-                "identity_mode=ans requires an ANS-6 DPoP proof on this call. "
-                "Browsers cannot hold agent identity keys; drive this flow with the "
-                "scripted agents (npm run agent-test).",
-            )
-        # Starlette caches the body, so reading it here does not disturb model binding.
-        body = await request.body()
-        try:
-            return await ans_identity.authenticate(
-                proofs[0], request.method, request.url.path, body
-            )
-        except AnsVerificationError as exc:
-            raise HTTPException(401, str(exc)) from exc
+    authenticate = build_authenticator(ans_identity, dpop_required)
 
     # Annotated form rather than a Depends() default: same wiring, and it keeps the
     # dependency out of the function's mutable-default position.
     Caller = Annotated[AuthenticatedAgent | None, Depends(authenticate)]
-
-    def proven(agent: AuthenticatedAgent | None) -> str | None:
-        return agent.ans_name.value if agent else None
 
     @router.post("/agents/{agent_id}/join", response_model=WorkspaceState)
     async def join(agent_id: str, caller: Caller):

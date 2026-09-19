@@ -17,10 +17,12 @@ from server.app.models import (
     ChangeSet,
     Conflict,
     Event,
+    TraceEvent,
     WorkspaceState,
     Workstream,
 )
 from server.app.store import read_state, write_state
+from server.app.tracing import TraceSink
 
 # Event type strings. P2's UI and agents key off these. Do not rename after 2:30 PM.
 AGENT_JOINED = "agent_joined"
@@ -56,10 +58,11 @@ def _now() -> str:
 
 
 class Coordinator:
-    def __init__(self, db_path: Path, identity: IdentityAdapter, memory: MemoryAdapter):
+    def __init__(self, db_path: Path, identity: IdentityAdapter, memory: MemoryAdapter, trace: TraceSink | None = None):
         self.db_path = db_path
         self.identity = identity
         self.memory = memory
+        self.trace = trace
         self._lock = threading.Lock()
 
     # ---------- helpers ----------
@@ -112,6 +115,15 @@ class Coordinator:
             await self.memory.log(event)
         except Exception as exc:  # noqa: BLE001 - memory must never stall the demo
             log.warning("memory.log failed: %s", exc)
+        if self.trace:
+            try:
+                await self.trace.log(TraceEvent(
+                    trace_id=event.event_id, source="coordinator", event_type=event.event_type,
+                    timestamp=event.timestamp, objective_id=event.objective_id,
+                    workstream_id=event.workstream_id, agent_id=event.agent_id, payload=event.payload,
+                ))
+            except Exception as exc:  # noqa: BLE001 - tracing must never stall coordination
+                log.warning("trace.log failed: %s", exc)
         return event
 
     def _open_conflicts_for(self, state: WorkspaceState, ws_id: str) -> list[Conflict]:

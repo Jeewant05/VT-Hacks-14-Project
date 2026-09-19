@@ -1,42 +1,75 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from server.app.adapters import CacheMemory, MockIdentity
-from server.app.ans.identity import build_ans_identity
+from server.app.adapters import CacheMemory, IdentityAdapter, MemoryAdapter, MockIdentity
 from server.app.config import Settings
 from server.app.live_agents import LiveRuns
 from server.app.live_routes import build_live_router
 from server.app.models import Health, WorkspaceState
+from server.app.orchestration import OrchestrationKernel
+from server.app.orchestration_routes import build_orchestration_router
+from server.app.providers import build_agent_providers
 from server.app.routes import build_router
 from server.app.service import Coordinator
 from server.app.store import read_state
+from server.app.trace_routes import build_trace_router
+from server.app.tracing import build_trace_sink
 
 
 def _fresh_state_for(settings: Settings):
     """Reset restores the fixture with the same ANSNames the seed script used."""
+
     def build() -> WorkspaceState:
         from scripts.database import demo_state
+
         return demo_state(settings.ans_domain)
 
     return build
 
 
+def build_identity(settings: Settings) -> IdentityAdapter:
+    # ans mode fails fast on missing credentials rather than silently falling back
+    # to the fixture, which would misreport the demo as verified.
+    if settings.identity_mode == "ans":
+        from server.app.ans.identity import build_ans_identity
+
+        return build_ans_identity(settings)
+    return MockIdentity()
+
+
+def build_memory(settings: Settings) -> MemoryAdapter:
+    seeded = read_state(settings.resolved_database_path).decisions
+    if settings.memory_mode == "databricks":
+        from server.app.memory_databricks import DatabricksMemory
+
+        return DatabricksMemory(settings, fallback=CacheMemory(seeded))
+    return CacheMemory(seeded)
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
-    app = FastAPI(title="Synapse API", version="0.3.0")
-    app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins.split(","), allow_methods=["GET", "POST"], allow_headers=["*"])
-    # The adapter follows IDENTITY_MODE; ans mode fails fast rather than silently
-    # falling back to the fixture, which would misreport the demo as verified.
-    ans_identity = build_ans_identity(settings) if settings.identity_mode == "ans" else None
-    identity = ans_identity or MockIdentity()
-    memory = CacheMemory(read_state(settings.resolved_database_path).decisions)
-    coordinator = Coordinator(settings.resolved_database_path, identity, memory)
+    app = FastAPI(title="Synapse API", version="0.6.0")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins.split(","),
+        allow_methods=["GET", "POST"],
+        allow_headers=["*"],
+    )
+    trace = build_trace_sink(settings)
+    identity = build_identity(settings)
+    # Only the ANS adapter can verify a DPoP proof, so the gate is wired only then.
+    ans_identity = identity if settings.identity_mode == "ans" else None
+    coordinator = Coordinator(
+        settings.resolved_database_path, identity, build_memory(settings), trace
+    )
 
     @app.get("/health", response_model=Health)
     def health() -> Health:
         return Health(
             identity_mode=settings.identity_mode,
             memory_mode=settings.memory_mode,
+            trace_mode=trace.source,
+            live_integrations=settings.live_integrations,
             identity_tier="badge" if ans_identity else "none",
             dpop_required=bool(ans_identity and settings.ans_dpop_required),
         )
@@ -53,9 +86,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             dpop_required=settings.ans_dpop_required,
         )
     )
-    if settings.agent_provider == "gemini" and settings.gemini_api_key:
-        from server.app.gemini import GeminiProvider
-        app.include_router(build_live_router(LiveRuns(GeminiProvider(settings), settings.resolved_database_path.parent / "live-runs")))
+    app.include_router(build_trace_router(trace))
+    app.include_router(
+        build_orchestration_router(
+            OrchestrationKernel(settings.resolved_database_path, identity, trace),
+            ans_identity=ans_identity,
+            dpop_required=settings.ans_dpop_required,
+        )
+    )
+    configured = build_agent_providers(settings)
+    providers = {
+        role: configured[source]
+        for role, source in {
+            "backend": "backend",
+            "frontend": "frontend",
+            "integration": "qa",
+        }.items()
+        if source in configured
+    }
+    runs = LiveRuns(providers, settings.resolved_database_path.parent / "live-runs", trace)
+    app.include_router(build_live_router(runs, settings.gemini_model))
     return app
 
 

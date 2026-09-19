@@ -8,10 +8,12 @@ dependencies = [
     "uvicorn[standard]>=0.34,<1",
     "pydantic-settings>=2.8,<3",
     "mcp>=1.9,<2",
-    # ANS identity mode: RA/transparency-log calls, DNS discovery, DPoP verification.
     "httpx>=0.28,<1",
+    # ANS identity mode: DNS discovery and DPoP/certificate verification.
     "dnspython>=2.7,<3",
     "cryptography>=44,<51",
+    # Databricks tracing sink.
+    "databricks-sdk>=0.80,<1",
 ]
 
 [dependency-groups]

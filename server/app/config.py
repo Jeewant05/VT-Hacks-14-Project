@@ -4,18 +4,40 @@ from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parents[2]
+Vendor = Literal["none", "gemini", "cerebras", "groq", "github", "openrouter", "openai"]
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ROOT / ".env", extra="ignore")
     identity_mode: Literal["mock", "ans"] = "mock"
-    memory_mode: Literal["cache"] = "cache"
+    memory_mode: Literal["cache", "databricks"] = "cache"
+    trace_mode: Literal["cache", "databricks"] = "cache"
     database_path: Path = Path(".local/synapse.db")
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
-    agent_provider: Literal["none", "gemini"] = "none"
+
+    # One independent provider per role. "none" keeps that live role unconfigured.
+    backend_provider: Vendor = "none"
+    frontend_provider: Vendor = "none"
+    qa_provider: Vendor = "none"
+
+    # Gemini supports a shared fallback key plus a dedicated key for each role.
     gemini_api_key: str | None = None
+    gemini_api_key_backend: str | None = None
+    gemini_api_key_frontend: str | None = None
+    gemini_api_key_qa: str | None = None
     gemini_model: str = "gemini-2.5-flash"
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
+
+    cerebras_api_key: str | None = None
+    cerebras_model: str | None = None
+    groq_api_key: str | None = None
+    groq_model: str | None = None
+    github_api_key: str | None = None
+    github_model: str | None = None
+    openrouter_api_key: str | None = None
+    openrouter_model: str | None = None
+    openai_api_key: str | None = None
+    openai_model: str | None = None
 
     # --- ANS (identity_mode=ans) ---
     # The CLI wants ANS_API_KEY="<key>:<secret>"; they stay split here and are
@@ -38,6 +60,13 @@ class Settings(BaseSettings):
     # `ans-cli get-identity-certs <agentId>` once an agent is ACTIVE.
     ans_identity_ca_bundle: str | None = None
 
+    databricks_host: str = ""
+    databricks_token: str = ""
+    databricks_warehouse_id: str = ""
+    databricks_catalog: str = ""
+    databricks_schema: str = ""
+    databricks_trace_table: str = "synapse_agent_traces"
+
     @property
     def resolved_database_path(self) -> Path:
         return ROOT / self.database_path
@@ -47,7 +76,9 @@ class Settings(BaseSettings):
         """The combined `key:secret` form the ANS RA expects."""
         if not self.ans_api_key:
             return None
-        return f"{self.ans_api_key}:{self.ans_api_secret}" if self.ans_api_secret else self.ans_api_key
+        if not self.ans_api_secret:
+            return self.ans_api_key
+        return f"{self.ans_api_key}:{self.ans_api_secret}"
 
     @property
     def trusted_tl_hosts(self) -> frozenset[str]:
@@ -58,3 +89,24 @@ class Settings(BaseSettings):
     @property
     def dns_nameservers(self) -> list[str]:
         return [ns.strip() for ns in self.ans_dns_nameservers.split(",") if ns.strip()]
+
+    @property
+    def databricks_trace_table_name(self) -> str:
+        if not self.databricks_catalog or not self.databricks_schema:
+            return self.databricks_trace_table
+        return f"{self.databricks_catalog}.{self.databricks_schema}.{self.databricks_trace_table}"
+
+    @property
+    def live_agents_enabled(self) -> bool:
+        return all(
+            vendor != "none"
+            for vendor in (self.backend_provider, self.frontend_provider, self.qa_provider)
+        )
+
+    @property
+    def live_integrations(self) -> bool:
+        return (
+            self.identity_mode != "mock"
+            or self.memory_mode != "cache"
+            or self.live_agents_enabled
+        )

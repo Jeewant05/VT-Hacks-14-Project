@@ -1,15 +1,15 @@
 import asyncio
-import uuid
+import json
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from server.app.live_agents import LiveRuns
+from server.app.live_agents import ROLES, LiveRuns
 
 
 class LiveStartRequest(BaseModel):
-    objective: str
+    objective: str = Field(min_length=1, max_length=2_000)
 
 
 class LiveRunResponse(BaseModel):
@@ -17,14 +17,41 @@ class LiveRunResponse(BaseModel):
     status: str
 
 
-def build_live_router(runs: LiveRuns) -> APIRouter:
+def build_live_router(runs: LiveRuns, model: str) -> APIRouter:
     router = APIRouter(prefix="/live", tags=["live-agents"])
+
+    @router.get("/config")
+    async def config():
+        return {
+            "configured": runs.configured,
+            "model": model,
+            "roles": [
+                {
+                    "id": role.id,
+                    "title": role.title,
+                    "responsibility": role.responsibility,
+                    "configured": role.id in runs.configured_roles,
+                }
+                for role in ROLES
+            ],
+        }
 
     @router.post("/runs", response_model=LiveRunResponse)
     async def start(body: LiveStartRequest):
-        run_id = f"run-{uuid.uuid4().hex[:8]}"
-        runs.start(run_id, body.objective)
-        return LiveRunResponse(run_id=run_id, status="started")
+        try:
+            run = runs.start(body.objective)
+        except RuntimeError as exc:
+            raise HTTPException(503, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        return LiveRunResponse(run_id=run.run_id, status=run.status)
+
+    @router.get("/runs/{run_id}")
+    async def snapshot(run_id: str):
+        try:
+            return runs.get(run_id).snapshot()
+        except KeyError as exc:
+            raise HTTPException(404, "live run not found") from exc
 
     @router.get("/runs/{run_id}/events")
     async def events(run_id: str):
@@ -39,29 +66,11 @@ def build_live_router(runs: LiveRuns) -> APIRouter:
                 while sent < len(run.events):
                     event = run.events[sent]
                     sent += 1
-                    yield f"data: {__import__('json').dumps(event)}\n\n"
-                done = run.task is not None and run.task.done() and not run.conflict_pending
-                if done:
+                    yield f"data: {json.dumps(event)}\n\n"
+                if run.task is not None and run.task.done():
                     break
-                await asyncio.sleep(0.25)
+                await asyncio.sleep(0.2)
 
         return StreamingResponse(stream(), media_type="text/event-stream")
-
-    @router.post("/runs/{run_id}/approve", response_model=LiveRunResponse)
-    async def approve(run_id: str):
-        try:
-            run = runs.get(run_id)
-        except KeyError as exc:
-            raise HTTPException(404, "live run not found") from exc
-        run.approve()
-        return LiveRunResponse(run_id=run_id, status="approved")
-
-    @router.get("/runs/{run_id}/file")
-    async def file(run_id: str):
-        try:
-            run = runs.get(run_id)
-        except KeyError as exc:
-            raise HTTPException(404, "live run not found") from exc
-        return {"version": run.version, "content": run.content, "conflict_pending": run.conflict_pending}
 
     return router

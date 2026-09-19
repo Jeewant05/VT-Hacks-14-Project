@@ -24,3 +24,25 @@ agents to overwrite one another. The next UI integration should stream those
 
 The existing `npm run agent-test` remains the offline coordinator smoke test. It
 does not call Gemini and does not incur API usage.
+
+## Three-agent orchestration demo
+
+`agents/demo_agents.py` defines the three registered contributors used by the
+plan-before-write orchestration API. Start the app, then use this sequence:
+
+```sh
+curl -X POST http://127.0.0.1:8000/api/objectives
+curl -X POST http://127.0.0.1:8000/api/agents/demo-agent-1/plan
+curl -X POST http://127.0.0.1:8000/api/agents/demo-agent-2/plan
+curl -X POST http://127.0.0.1:8000/api/agents/demo-agent-3/plan
+curl http://127.0.0.1:8000/api/objectives/objective-oauth/status
+```
+
+The default plans intentionally contain the OAuth contract mismatch: Agent 1
+provides `token` and `user`, while Agent 2 initially consumes `accessToken` and
+`profile`. The kernel blocks execution before a write. Use the returned
+contract-conflict ID with `/api/conflicts/{id}/resolve`, then approve the
+proposal at `/api/conflicts/{id}/approve`. Only a workstream in `APPROVED` may
+call `/api/agents/{agent_id}/execute`; submitted ChangeSets are checked against
+the approved intention version, paths, symbols, contracts, database changes,
+and tests.
