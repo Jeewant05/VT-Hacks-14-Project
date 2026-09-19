@@ -17,3 +17,15 @@ The key proof happens before implementation: the coordinator blocks the three pl
 Target: under three minutes, five clean runs, no manual database edits. Report the guided clients honestly. The current identity and memory adapters are local fixtures; do not present them as live ANS or Databricks operations. Distinguish agent-reported tests from executed tests. Record a successful backup and tag the tested commit `demo-stable` only after the complete flow works.
 
 The pasted deadline is provisional: confirm this year's submission time and video requirements. Reserve relocation and sleep time. Submit ahead of the deadline; do not make code changes after the last clean rehearsal.
+
+## Live agents (Gemini)
+
+Set in `.env`: `BACKEND_PROVIDER=gemini`, `FRONTEND_PROVIDER=gemini`, `QA_PROVIDER=gemini`, and one key per role (`GEMINI_API_KEY_BACKEND`, `_FRONTEND`, `_QA`) or a single `GEMINI_API_KEY`. Restart `npm run dev:server`.
+
+In the dashboard click **Live agents** → **Start Gemini agents**. Three agents propose changes to `api-contract.json` in turn; the frontend proposal is held for approval; **Approve correction** completes the run. Timeline entries show `provider: gemini` per agent. A role whose key fails shows `agent_failed` and falls back to a scripted proposal so the run still completes.
+
+From a terminal: `curl -s -X POST localhost:8000/live/runs -H 'Content-Type: application/json' -d '{"objective":"Add organization OAuth login"}'` then `curl -s -N localhost:8000/live/runs/<run_id>/events`.
+
+## Coordinator scene from a terminal
+
+With `npm run dev:server` running: `bash scripts/scenario.sh`. Expect three file collisions on `src/auth/session.ts` with decision `scope-boundaries`, two intentional 409s, and `objective_completed` last.
