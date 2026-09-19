@@ -1,0 +1,557 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Synapse API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/state": {
+      "get": {
+        "summary": "State",
+        "operationId": "state_state_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceState"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AgentPrincipal": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "ans_name": {
+            "type": "string",
+            "title": "Ans Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "verified": {
+            "type": "boolean",
+            "title": "Verified",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ans_name",
+          "role"
+        ],
+        "title": "AgentPrincipal"
+      },
+      "ApiContract": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ],
+            "title": "Method"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "provides",
+              "consumes"
+            ],
+            "title": "Role"
+          },
+          "request_fields": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Request Fields"
+          },
+          "response_fields": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Response Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method",
+          "path",
+          "role"
+        ],
+        "title": "ApiContract"
+      },
+      "ChangeSet": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "workstream_id": {
+            "type": "string",
+            "title": "Workstream Id"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "commit_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit Sha"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "contract": {
+            "$ref": "#/components/schemas/ApiContract"
+          },
+          "tests": {
+            "items": {
+              "$ref": "#/components/schemas/TestResult"
+            },
+            "type": "array",
+            "title": "Tests"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "workstream_id",
+          "agent_id",
+          "files",
+          "contract"
+        ],
+        "title": "ChangeSet"
+      },
+      "Conflict": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "file",
+              "contract"
+            ],
+            "title": "Type"
+          },
+          "workstream_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Workstream Ids"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation"
+          },
+          "conflicting_field": {
+            "type": "string",
+            "title": "Conflicting Field"
+          },
+          "decision_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Id"
+          },
+          "recommendation": {
+            "type": "string",
+            "title": "Recommendation"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "resolved"
+            ],
+            "title": "Status",
+            "default": "open"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "workstream_ids",
+          "explanation",
+          "conflicting_field",
+          "recommendation"
+        ],
+        "title": "Conflict"
+      },
+      "Decision": {
+        "properties": {
+          "decision_id": {
+            "type": "string",
+            "title": "Decision Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "affected_component": {
+            "type": "string",
+            "title": "Affected Component"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision_id",
+          "title",
+          "content",
+          "affected_component",
+          "created_at"
+        ],
+        "title": "Decision"
+      },
+      "Event": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "objective_id": {
+            "type": "string",
+            "title": "Objective Id"
+          },
+          "workstream_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workstream Id"
+          },
+          "agent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_id",
+          "objective_id",
+          "event_type",
+          "timestamp"
+        ],
+        "title": "Event"
+      },
+      "Health": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status",
+            "default": "ok"
+          },
+          "identity_mode": {
+            "type": "string",
+            "title": "Identity Mode"
+          },
+          "memory_mode": {
+            "type": "string",
+            "title": "Memory Mode"
+          },
+          "live_integrations": {
+            "type": "boolean",
+            "title": "Live Integrations",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "identity_mode",
+          "memory_mode"
+        ],
+        "title": "Health"
+      },
+      "Objective": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "acceptance_criteria": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Acceptance Criteria"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "complete"
+            ],
+            "title": "Status",
+            "default": "active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "description",
+          "acceptance_criteria"
+        ],
+        "title": "Objective"
+      },
+      "TestResult": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "passed",
+              "failed",
+              "not_run"
+            ],
+            "title": "Status"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "agent_reported",
+              "synapse_executed"
+            ],
+            "title": "Source",
+            "default": "agent_reported"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "status"
+        ],
+        "title": "TestResult"
+      },
+      "WorkspaceState": {
+        "properties": {
+          "phase": {
+            "type": "string",
+            "const": "foundation",
+            "title": "Phase",
+            "default": "foundation"
+          },
+          "objective": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Objective"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "workstreams": {
+            "items": {
+              "$ref": "#/components/schemas/Workstream"
+            },
+            "type": "array",
+            "title": "Workstreams"
+          },
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/AgentPrincipal"
+            },
+            "type": "array",
+            "title": "Agents"
+          },
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/Conflict"
+            },
+            "type": "array",
+            "title": "Conflicts"
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/Decision"
+            },
+            "type": "array",
+            "title": "Decisions"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "title": "WorkspaceState"
+      },
+      "Workstream": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "objective_id": {
+            "type": "string",
+            "title": "Objective Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id"
+          },
+          "owned_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Owned Paths"
+          },
+          "depends_on": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Depends On"
+          },
+          "contract": {
+            "$ref": "#/components/schemas/ApiContract"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "active",
+              "blocked",
+              "complete"
+            ],
+            "title": "Status",
+            "default": "pending"
+          },
+          "latest_changeset": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChangeSet"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "objective_id",
+          "title",
+          "agent_id",
+          "owned_paths",
+          "contract"
+        ],
+        "title": "Workstream"
+      }
+    }
+  }
+}

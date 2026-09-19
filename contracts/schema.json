@@ -1,0 +1,569 @@
+{
+  "$defs": {
+    "AgentPrincipal": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "ans_name": {
+          "title": "Ans Name",
+          "type": "string"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "verified": {
+          "default": false,
+          "title": "Verified",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "ans_name",
+        "role"
+      ],
+      "title": "AgentPrincipal",
+      "type": "object"
+    },
+    "ApiContract": {
+      "properties": {
+        "method": {
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "provides",
+            "consumes"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "request_fields": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Request Fields",
+          "type": "object"
+        },
+        "response_fields": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Response Fields",
+          "type": "object"
+        }
+      },
+      "required": [
+        "method",
+        "path",
+        "role"
+      ],
+      "title": "ApiContract",
+      "type": "object"
+    },
+    "ChangeSet": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "workstream_id": {
+          "title": "Workstream Id",
+          "type": "string"
+        },
+        "agent_id": {
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "commit_sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Commit Sha"
+        },
+        "files": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Files",
+          "type": "array"
+        },
+        "contract": {
+          "$ref": "#/$defs/ApiContract"
+        },
+        "tests": {
+          "items": {
+            "$ref": "#/$defs/TestResult"
+          },
+          "title": "Tests",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "workstream_id",
+        "agent_id",
+        "files",
+        "contract"
+      ],
+      "title": "ChangeSet",
+      "type": "object"
+    },
+    "Conflict": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "file",
+            "contract"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "workstream_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Workstream Ids",
+          "type": "array"
+        },
+        "explanation": {
+          "title": "Explanation",
+          "type": "string"
+        },
+        "conflicting_field": {
+          "title": "Conflicting Field",
+          "type": "string"
+        },
+        "decision_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Decision Id"
+        },
+        "recommendation": {
+          "title": "Recommendation",
+          "type": "string"
+        },
+        "status": {
+          "default": "open",
+          "enum": [
+            "open",
+            "resolved"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "workstream_ids",
+        "explanation",
+        "conflicting_field",
+        "recommendation"
+      ],
+      "title": "Conflict",
+      "type": "object"
+    },
+    "Decision": {
+      "properties": {
+        "decision_id": {
+          "title": "Decision Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "content": {
+          "title": "Content",
+          "type": "string"
+        },
+        "affected_component": {
+          "title": "Affected Component",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "decision_id",
+        "title",
+        "content",
+        "affected_component",
+        "created_at"
+      ],
+      "title": "Decision",
+      "type": "object"
+    },
+    "Event": {
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "objective_id": {
+          "title": "Objective Id",
+          "type": "string"
+        },
+        "workstream_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workstream Id"
+        },
+        "agent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent Id"
+        },
+        "event_type": {
+          "title": "Event Type",
+          "type": "string"
+        },
+        "payload": {
+          "additionalProperties": true,
+          "title": "Payload",
+          "type": "object"
+        },
+        "timestamp": {
+          "title": "Timestamp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_id",
+        "objective_id",
+        "event_type",
+        "timestamp"
+      ],
+      "title": "Event",
+      "type": "object"
+    },
+    "Objective": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "acceptance_criteria": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Acceptance Criteria",
+          "type": "array"
+        },
+        "status": {
+          "default": "active",
+          "enum": [
+            "active",
+            "complete"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "description",
+        "acceptance_criteria"
+      ],
+      "title": "Objective",
+      "type": "object"
+    },
+    "TestResult": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "not_run"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "source": {
+          "default": "agent_reported",
+          "enum": [
+            "agent_reported",
+            "synapse_executed"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "status"
+      ],
+      "title": "TestResult",
+      "type": "object"
+    },
+    "VerificationResult": {
+      "properties": {
+        "agent_id": {
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "verified": {
+          "title": "Verified",
+          "type": "boolean"
+        },
+        "source": {
+          "enum": [
+            "ans",
+            "mock"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "evidence": {
+          "title": "Evidence",
+          "type": "string"
+        },
+        "checked_at": {
+          "title": "Checked At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "agent_id",
+        "verified",
+        "source",
+        "evidence",
+        "checked_at"
+      ],
+      "title": "VerificationResult",
+      "type": "object"
+    },
+    "WorkspaceState": {
+      "properties": {
+        "phase": {
+          "const": "foundation",
+          "default": "foundation",
+          "title": "Phase",
+          "type": "string"
+        },
+        "objective": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Objective"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "workstreams": {
+          "items": {
+            "$ref": "#/$defs/Workstream"
+          },
+          "title": "Workstreams",
+          "type": "array"
+        },
+        "agents": {
+          "items": {
+            "$ref": "#/$defs/AgentPrincipal"
+          },
+          "title": "Agents",
+          "type": "array"
+        },
+        "conflicts": {
+          "items": {
+            "$ref": "#/$defs/Conflict"
+          },
+          "title": "Conflicts",
+          "type": "array"
+        },
+        "decisions": {
+          "items": {
+            "$ref": "#/$defs/Decision"
+          },
+          "title": "Decisions",
+          "type": "array"
+        },
+        "events": {
+          "items": {
+            "$ref": "#/$defs/Event"
+          },
+          "title": "Events",
+          "type": "array"
+        }
+      },
+      "title": "WorkspaceState",
+      "type": "object"
+    },
+    "Workstream": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "objective_id": {
+          "title": "Objective Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "agent_id": {
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "owned_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Owned Paths",
+          "type": "array"
+        },
+        "depends_on": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Depends On",
+          "type": "array"
+        },
+        "contract": {
+          "$ref": "#/$defs/ApiContract"
+        },
+        "status": {
+          "default": "pending",
+          "enum": [
+            "pending",
+            "active",
+            "blocked",
+            "complete"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "latest_changeset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ChangeSet"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "objective_id",
+        "title",
+        "agent_id",
+        "owned_paths",
+        "contract"
+      ],
+      "title": "Workstream",
+      "type": "object"
+    },
+    "WriteReceipt": {
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "databricks",
+            "cache"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "written",
+            "pending",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_id",
+        "source",
+        "status"
+      ],
+      "title": "WriteReceipt",
+      "type": "object"
+    }
+  },
+  "anyOf": [
+    {
+      "$ref": "#/$defs/WorkspaceState"
+    },
+    {
+      "$ref": "#/$defs/VerificationResult"
+    },
+    {
+      "$ref": "#/$defs/WriteReceipt"
+    }
+  ]
+}

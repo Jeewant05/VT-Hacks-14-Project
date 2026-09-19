@@ -1,0 +1,101 @@
+{
+  "phase": "foundation",
+  "objective": {
+    "id": "oauth-objective",
+    "title": "Add organization-level OAuth login",
+    "description": "Coordinate backend and frontend changes before merge.",
+    "acceptance_criteria": [
+      "Verify participating agent identities through ANS.",
+      "Align both agents on the approved authentication contract.",
+      "Review changes, tests, and conflict resolution together."
+    ],
+    "status": "active"
+  },
+  "workstreams": [
+    {
+      "id": "backend",
+      "objective_id": "oauth-objective",
+      "title": "OAuth API",
+      "agent_id": "backend-agent",
+      "owned_paths": [
+        "src/api/auth/**"
+      ],
+      "depends_on": [],
+      "contract": {
+        "method": "POST",
+        "path": "/api/oauth",
+        "role": "provides",
+        "request_fields": {},
+        "response_fields": {
+          "token": "string",
+          "user": "object"
+        }
+      },
+      "status": "pending",
+      "latest_changeset": null
+    },
+    {
+      "id": "frontend",
+      "objective_id": "oauth-objective",
+      "title": "Organization login",
+      "agent_id": "frontend-agent",
+      "owned_paths": [
+        "src/components/login/**"
+      ],
+      "depends_on": [
+        "backend"
+      ],
+      "contract": {
+        "method": "POST",
+        "path": "/api/oauth",
+        "role": "consumes",
+        "request_fields": {},
+        "response_fields": {
+          "accessToken": "string",
+          "profile": "object"
+        }
+      },
+      "status": "pending",
+      "latest_changeset": null
+    }
+  ],
+  "agents": [
+    {
+      "id": "backend-agent",
+      "ans_name": "backend.demo",
+      "role": "backend",
+      "verified": false
+    },
+    {
+      "id": "frontend-agent",
+      "ans_name": "frontend.demo",
+      "role": "frontend",
+      "verified": false
+    }
+  ],
+  "conflicts": [],
+  "decisions": [
+    {
+      "decision_id": "auth-response",
+      "title": "Authentication response contract",
+      "content": "POST /api/oauth must return token (string) and user (object).",
+      "affected_component": "authentication",
+      "created_at": "2026-09-19T00:00:00Z"
+    },
+    {
+      "decision_id": "scope-boundaries",
+      "title": "Workstream ownership",
+      "content": "Backend owns src/api/auth/**; frontend owns src/components/login/**.",
+      "affected_component": "coordination",
+      "created_at": "2026-09-19T00:00:00Z"
+    },
+    {
+      "decision_id": "review-required",
+      "title": "Convergence requires review",
+      "content": "Resolve declared contract conflicts before completing the objective.",
+      "affected_component": "review",
+      "created_at": "2026-09-19T00:00:00Z"
+    }
+  ],
+  "events": []
+}
