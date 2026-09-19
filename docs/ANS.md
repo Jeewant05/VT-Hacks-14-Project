@@ -249,3 +249,38 @@ rotates the TLS certificate actually served, so sealing a `serverCerts[]`
 fingerprint we never present would make every callee verification fail — worse
 than publishing none. Pass `--with-server-cert` only where we terminate TLS
 ourselves and can serve exactly the registered certificate.
+
+### DNS records at Porkbun
+
+The app is `synapse-vt` on Fly (`synapse-vt.fly.dev`). Four hostnames point at it.
+Fly issues the certificates once these resolve.
+
+| Type | Host (Porkbun "Host" field) | Answer |
+| --- | --- | --- |
+| A | *(blank — the apex)* | `66.241.124.238` |
+| AAAA | *(blank)* | `2a09:8280:1::194:74e1:0` |
+| A | `backend` | `66.241.124.238` |
+| AAAA | `backend` | `2a09:8280:1::194:74e1:0` |
+| A | `frontend` | `66.241.124.238` |
+| AAAA | `frontend` | `2a09:8280:1::194:74e1:0` |
+| A | `telemetry` | `66.241.124.238` |
+| AAAA | `telemetry` | `2a09:8280:1::194:74e1:0` |
+
+**Delete Porkbun's parking records first.** A fresh domain ships with apex `A`
+records pointing at `207.207.210.x` and a wildcard `CNAME` to
+`pixie.porkbun.com`. The apex records must go or they will answer instead of
+Fly's. The wildcard can stay — explicit subdomain records win on specificity —
+but removing it avoids surprises for hosts we have not defined.
+
+The IPv4 is Fly-shared, which is fine: routing is by SNI and the app forces
+HTTPS.
+
+Then:
+
+```sh
+fly certs check synapse-vt.us        # repeat per hostname until Ready
+fly certs list --app synapse-vt
+```
+
+The ANS `_acme-challenge`, `_ans` and `_ans-badge` TXT records land in this same
+zone later, during registration.
