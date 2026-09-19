@@ -9,6 +9,8 @@ from server.app.models import Health, WorkspaceState
 from server.app.routes import build_router
 from server.app.service import Coordinator
 from server.app.store import read_state
+from server.app.trace_routes import build_trace_router
+from server.app.tracing import build_trace_sink
 
 
 def _fresh_state() -> WorkspaceState:
@@ -22,20 +24,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins.split(","), allow_methods=["GET", "POST"], allow_headers=["*"])
     identity = MockIdentity()
     memory = CacheMemory(read_state(settings.resolved_database_path).decisions)
-    coordinator = Coordinator(settings.resolved_database_path, identity, memory)
+    trace = build_trace_sink(settings)
+    coordinator = Coordinator(settings.resolved_database_path, identity, memory, trace)
 
     @app.get("/health", response_model=Health)
     def health() -> Health:
-        return Health(identity_mode=settings.identity_mode, memory_mode=settings.memory_mode)
+        return Health(identity_mode=settings.identity_mode, memory_mode=settings.memory_mode, trace_mode=trace.source)
 
     @app.get("/state", response_model=WorkspaceState)
     def state() -> WorkspaceState:
         return read_state(settings.resolved_database_path)
 
     app.include_router(build_router(coordinator, _fresh_state))
+    app.include_router(build_trace_router(trace))
     if settings.agent_provider == "gemini" and settings.gemini_api_key:
         from server.app.gemini import GeminiProvider
-        app.include_router(build_live_router(LiveRuns(GeminiProvider(settings), settings.resolved_database_path.parent / "live-runs")))
+        app.include_router(build_live_router(LiveRuns(GeminiProvider(settings), settings.resolved_database_path.parent / "live-runs", trace)))
     return app
 
 

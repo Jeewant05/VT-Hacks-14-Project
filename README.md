@@ -16,7 +16,23 @@ npm run dev
 
 Open http://127.0.0.1:5173. The dashboard should show **Coordinator connected**, the prepared OAuth objective, and three pending workstreams. API documentation is at http://127.0.0.1:8000/docs. Stop both services with Ctrl+C.
 
-No sponsor credentials are required for setup. `IDENTITY_MODE=mock` and `MEMORY_MODE=cache` are the only implemented modes. Mock identity results are fixtures, not ANS verification. The memory adapter is an in-process development fixture, not durable Databricks delivery. Seeded decisions are local fixtures.
+No sponsor credentials are required for setup. `IDENTITY_MODE=mock`, `MEMORY_MODE=cache`, and `TRACE_MODE=cache` keep the app local. Mock identity results and seeded decisions are fixtures. The cache trace store exists only for the running process.
+
+## Databricks trace layer
+
+Synapse can write coordinator and live-agent events to a Unity Catalog Delta table for debugging and verification. Create the table with [the trace schema](docs/databricks-trace-schema.sql), then set the following server-only values in `.env`:
+
+```sh
+TRACE_MODE=databricks
+DATABRICKS_HOST=https://your-workspace.cloud.databricks.com
+DATABRICKS_TOKEN=<personal-access-token-or-service-principal-token>
+DATABRICKS_WAREHOUSE_ID=<sql-warehouse-id>
+DATABRICKS_CATALOG=<catalog>
+DATABRICKS_SCHEMA=<schema>
+DATABRICKS_TRACE_TABLE=synapse_agent_traces
+```
+
+The principal needs `USE CATALOG`, `USE SCHEMA`, `INSERT`, and `SELECT` for that table. With complete configuration, `GET /traces` reads the newest persisted records and `GET /traces?run_id=run-…` filters a live run. If the Databricks settings are incomplete, Synapse keeps running with the in-process cache and reports `trace_mode: cache` from `/health`.
 
 ## Commands
 

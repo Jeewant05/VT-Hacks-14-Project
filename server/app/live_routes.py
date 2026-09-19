@@ -53,7 +53,7 @@ def build_live_router(runs: LiveRuns) -> APIRouter:
             run = runs.get(run_id)
         except KeyError as exc:
             raise HTTPException(404, "live run not found") from exc
-        run.approve()
+        await run.approve()
         return LiveRunResponse(run_id=run_id, status="approved")
 
     @router.get("/runs/{run_id}/file")
