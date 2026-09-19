@@ -4,6 +4,7 @@ import { initialDemo, type DemoEvent, type DemoState, type Phase } from './demo'
 
 export type WorkspaceState = components['schemas']['WorkspaceState'];
 export type Health = components['schemas']['Health'];
+export type TraceEvent = components['schemas']['TraceEvent'];
 type ApiContract = components['schemas']['ApiContract'];
 type ChangeSet = components['schemas']['ChangeSet'];
 type PendingAction = 'start' | 'coordinate' | 'submit' | 'reset' | null;
@@ -76,6 +77,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
 export function useCoordinator() {
   const [workspace, setWorkspace] = useState<WorkspaceState | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
+  const [traceEvents, setTraceEvents] = useState<TraceEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingAction>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
@@ -96,8 +98,10 @@ export function useCoordinator() {
       const [nextHealth, nextWorkspace] = await Promise.all([
         request<Health>('/health'), request<WorkspaceState>('/state'),
       ]);
+      const nextTraces = await request<TraceEvent[]>('/traces?limit=12').catch(() => []);
       if (nextHealth.status !== 'ok') throw new Error('Coordinator health response was invalid.');
       if (!pendingRef.current) setWorkspace(nextWorkspace);
+      setTraceEvents(nextTraces);
       setHealth(nextHealth); setError(null); setUpdatedAt(new Date());
       return true;
     } catch (failure) {
@@ -180,7 +184,7 @@ export function useCoordinator() {
   const demo = useMemo(() => workspaceToDemo(workspace, pending), [workspace, pending]);
 
   return {
-    workspace, health, demo, error, pending, updatedAt,
+    workspace, health, traceEvents, demo, error, pending, updatedAt,
     connected: Boolean(health), busy: pending !== null,
     refresh, start, applyPlan, submit, reset,
   };
