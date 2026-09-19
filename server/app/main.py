@@ -6,6 +6,7 @@ from server.app.config import Settings
 from server.app.live_agents import LiveRuns
 from server.app.live_routes import build_live_router
 from server.app.models import Health, WorkspaceState
+from server.app.providers import build_agent_providers
 from server.app.routes import build_router
 from server.app.service import Coordinator
 from server.app.store import read_state
@@ -36,7 +37,7 @@ def build_memory(settings: Settings) -> MemoryAdapter:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
-    app = FastAPI(title="Synapse API", version="0.4.0")
+    app = FastAPI(title="Synapse API", version="0.5.0")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins.split(","),
@@ -60,12 +61,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return read_state(settings.resolved_database_path)
 
     app.include_router(build_router(coordinator, _fresh_state))
-    if settings.agent_provider == "gemini" and settings.gemini_api_key:
-        from server.app.gemini import GeminiProvider
-
-        runs = LiveRuns(
-            GeminiProvider(settings), settings.resolved_database_path.parent / "live-runs"
-        )
+    if settings.live_agents_enabled:
+        providers = build_agent_providers(settings)
+        runs = LiveRuns(providers, settings.resolved_database_path.parent / "live-runs")
         app.include_router(build_live_router(runs))
     return app
 
