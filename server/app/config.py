@@ -22,6 +22,9 @@ class Settings(BaseSettings):
 
     # Vendor keys. Only the ones you use need to be set.
     gemini_api_key: str | None = None
+    gemini_api_key_backend: str | None = None
+    gemini_api_key_frontend: str | None = None
+    gemini_api_key_qa: str | None = None
     gemini_model: str = "gemini-2.5-flash"
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
     cerebras_api_key: str | None = None

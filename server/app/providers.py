@@ -88,11 +88,12 @@ OPENAI_COMPATIBLE = {
 }
 
 
-def build_provider(vendor: str, settings: Settings) -> Provider:
+def build_provider(vendor: str, settings: Settings, role: str = "") -> Provider:
     vendor = vendor.lower()
     if vendor == "gemini":
-        return GeminiProvider(settings.gemini_api_key or "", settings.gemini_model,
-                              settings.gemini_base_url)
+        # Per-role key (GEMINI_API_KEY_BACKEND etc.) wins; falls back to GEMINI_API_KEY.
+        key = getattr(settings, f"gemini_api_key_{role}", None) or settings.gemini_api_key or ""
+        return GeminiProvider(key, settings.gemini_model, settings.gemini_base_url)
     if vendor in OPENAI_COMPATIBLE:
         default_url, default_model = OPENAI_COMPATIBLE[vendor]
         key = getattr(settings, f"{vendor}_api_key", "") or ""
@@ -114,7 +115,7 @@ def build_agent_providers(settings: Settings) -> dict[str, Provider]:
         if not vendor or vendor == "none":
             continue
         try:
-            built[role] = build_provider(vendor, settings)
+            built[role] = build_provider(vendor, settings, role)
         except ProviderError:
             continue
     return built
