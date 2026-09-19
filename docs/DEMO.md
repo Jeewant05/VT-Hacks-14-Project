@@ -1,15 +1,15 @@
 # Demo runbook
 
-## Live three-agent Gemini demo
+## Live three-agent open-model demo
 
-1. Copy `.env.example` to `.env`, set all three provider values to `gemini` and add the three role-specific Gemini keys, then run `npm run setup` and `npm run dev`.
+1. Copy `.env.example` to `.env`, add an `HF_TOKEN` with Inference Providers permission, then run `npm run setup` and `npm run dev`.
 2. Open the live dashboard, enter a small full-stack objective, and start the agents.
 3. Watch all three agents publish an intention. Explain that these plans are injected into every implementation prompt before any file is written.
 4. Point out that backend and frontend then build concurrently using separate APIs, exclusive directory ownership, and one shared contract.
 5. The integration agent reviews their staged output; after validation, all files are committed to the run sandbox together.
 6. Open generated files in the project browser and finish on the coordinator's validation event.
 
-Be precise in the presentation: the displayed files are genuinely returned by Gemini and written to an isolated local run directory. Synapse validates boundaries, but it does not execute or commit generated code. Use the guided simulation when a Gemini key or network connection is unavailable.
+Be precise in the presentation: the displayed files are genuinely returned through Hugging Face Inference Providers and written to an isolated local run directory. Synapse validates boundaries, but it does not execute or commit generated code. Use the guided simulation when a token or network connection is unavailable.
 
 ## Foundation smoke check (available now)
 
@@ -29,11 +29,11 @@ Target: under three minutes, five clean runs, no manual database edits. Report t
 
 The pasted deadline is provisional: confirm this year's submission time and video requirements. Reserve relocation and sleep time. Submit ahead of the deadline; do not make code changes after the last clean rehearsal.
 
-## Live agents (Gemini)
+## Live agents (Hugging Face)
 
-Set in `.env`: `BACKEND_PROVIDER=gemini`, `FRONTEND_PROVIDER=gemini`, `QA_PROVIDER=gemini`, and one key per role (`GEMINI_API_KEY_BACKEND`, `_FRONTEND`, `_QA`) or a single `GEMINI_API_KEY`. Restart `npm run dev:server`.
+Set in `.env`: `BACKEND_PROVIDER=huggingface`, `FRONTEND_PROVIDER=huggingface`, `QA_PROVIDER=huggingface`, and `HF_TOKEN`. The shared model defaults to `openai/gpt-oss-120b:fastest`; role-specific model overrides are optional. Restart `npm run dev:server`.
 
-In the dashboard click **Live agents** → **Start Gemini agents**. Three agents propose changes to `api-contract.json` in turn; the frontend proposal is held for approval; **Approve correction** completes the run. Timeline entries show `provider: gemini` per agent. A role whose key fails shows `agent_failed` and falls back to a scripted proposal so the run still completes.
+In the dashboard start the three coding agents. They publish intentions first, backend and frontend build in parallel, integration reviews the staged files, and the coordinator commits the validated run artifacts. Each card shows its actual provider and model.
 
 From a terminal: `curl -s -X POST localhost:8000/live/runs -H 'Content-Type: application/json' -d '{"objective":"Add organization OAuth login"}'` then `curl -s -N localhost:8000/live/runs/<run_id>/events`.
 

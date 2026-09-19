@@ -20,7 +20,7 @@ export function LiveDashboard({ onSimulation }: Props) {
 
   useEffect(() => {
     void getLiveConfig().then(setConfig).catch(cause => {
-      setError(cause instanceof Error ? cause.message : 'Could not load Gemini configuration.');
+      setError(cause instanceof Error ? cause.message : 'Could not load agent configuration.');
     });
     return () => sourceRef.current?.close();
   }, []);
@@ -61,7 +61,7 @@ export function LiveDashboard({ onSimulation }: Props) {
       };
       sourceRef.current = source;
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not start the Gemini agents.');
+      setError(cause instanceof Error ? cause.message : 'Could not start the coding agents.');
     } finally { setBusy(false); }
   }
 
@@ -72,14 +72,14 @@ export function LiveDashboard({ onSimulation }: Props) {
 
   return <main className="live-shell">
     <header className="live-header">
-      <div><p className="eyebrow">SYNAPSE · GEMINI CODE LAB</p><h1>Three agents. One coordinated project.</h1><p>Frontend and backend build in parallel. The integration agent reviews both, then the coordinator validates every generated path before writing it.</p></div>
+      <div><p className="eyebrow">SYNAPSE · OPEN MODEL CODE LAB</p><h1>Three agents. One coordinated project.</h1><p>Frontend and backend build in parallel. The integration agent reviews both, then the coordinator validates every generated path before writing it.</p></div>
       <button className="secondary" onClick={onSimulation}>Open guided simulation</button>
     </header>
 
     <section className="prompt-card">
-      <div className="prompt-heading"><div><label htmlFor="objective">Project objective</label><small>{config ? `${config.model} · ${config.configured ? 'ready' : 'setup required'}` : 'Checking configuration…'}</small></div>{run && <span className={`run-status status-${run.status}`}>{run.status}</span>}</div>
+      <div className="prompt-heading"><div><label htmlFor="objective">Project objective</label><small>{config ? `3 role providers · ${config.configured ? 'ready' : 'setup required'}` : 'Checking configuration…'}</small></div>{run && <span className={`run-status status-${run.status}`}>{run.status}</span>}</div>
       <textarea id="objective" value={objective} maxLength={2000} onChange={event => setObjective(event.target.value)} disabled={busy || !!run} />
-      <div className="prompt-actions"><button className="primary" onClick={start} disabled={busy || !!run || !config?.configured}>{busy ? 'Starting…' : 'Start three Gemini agents'}</button>{run && <button className="secondary" onClick={reset} disabled={run.status === 'planning' || run.status === 'building'}>New run</button>}<span>Generated code stays in an isolated local run directory.</span></div>
+      <div className="prompt-actions"><button className="primary" onClick={start} disabled={busy || !!run || !config?.configured}>{busy ? 'Starting…' : 'Start three coding agents'}</button>{run && <button className="secondary" onClick={reset} disabled={run.status === 'planning' || run.status === 'building'}>New run</button>}<span>Generated code stays in an isolated local run directory.</span></div>
       {config && !config.configured && <div className="setup-note"><strong>Three agent APIs needed.</strong> Set <code>BACKEND_PROVIDER</code>, <code>FRONTEND_PROVIDER</code>, and <code>QA_PROVIDER</code>, plus the matching API keys in <code>.env</code>, then restart the API.</div>}
     </section>
 
@@ -88,7 +88,7 @@ export function LiveDashboard({ onSimulation }: Props) {
     <section className="live-agent-grid">{roleIds.map(agent => {
       const details = config?.roles.find(role => role.id === agent);
       const count = artifacts.filter(item => item.agent_id === agent).length;
-      return <article className={`agent-card-live state-${roleStatus[agent].toLowerCase().replaceAll(' ', '-')}`} key={agent}><div className="agent-dot" /><div><h2>{details?.title ?? agent}<span className={details?.configured ? 'api-ready' : 'api-missing'}>{details?.configured ? 'API ready' : 'API missing'}</span></h2><p>{details?.responsibility}</p>{run?.intentions[agent] && <blockquote className="agent-intention"><b>Intention</b>{run.intentions[agent]}</blockquote>}<small>{roleStatus[agent]}{count ? ` · ${count} file${count === 1 ? '' : 's'}` : ''}</small></div></article>;
+      return <article className={`agent-card-live state-${roleStatus[agent].toLowerCase().replaceAll(' ', '-')}`} key={agent}><div className="agent-dot" /><div><h2>{details?.title ?? agent}<span className={details?.configured ? 'api-ready' : 'api-missing'}>{details?.configured ? 'API ready' : 'API missing'}</span></h2><p>{details?.responsibility}</p>{details?.configured && <p className="agent-provider">{details.provider} · {details.model}</p>}{run?.intentions[agent] && <blockquote className="agent-intention"><b>Intention</b>{run.intentions[agent]}</blockquote>}<small>{roleStatus[agent]}{count ? ` · ${count} file${count === 1 ? '' : 's'}` : ''}</small></div></article>;
     })}</section>
 
     <section className="live-workspace">

@@ -2,11 +2,12 @@
 
 Two wire formats:
   - Gemini REST (generateContent)
-  - OpenAI-compatible chat completions (Cerebras, Groq, GitHub Models, OpenRouter, OpenAI)
+  - OpenAI-compatible chat completions (Hugging Face, Cerebras, Groq, GitHub, and OpenAI)
 
 Providers return text only. File changes are applied by the coordinator after validation.
 """
 
+import asyncio
 from typing import Any, Protocol
 
 import httpx
@@ -53,7 +54,7 @@ class GeminiProvider:
 
 
 class OpenAICompatibleProvider:
-    """Cerebras, Groq, GitHub Models, OpenRouter, OpenAI: same /chat/completions shape."""
+    """Providers using the OpenAI-compatible /chat/completions shape."""
 
     def __init__(self, name: str, api_key: str, model: str, base_url: str):
         if not api_key:
@@ -69,8 +70,21 @@ class OpenAICompatibleProvider:
             "temperature": 0.2,
         }
         headers = {"Authorization": f"Bearer {self.api_key}"}
+        response = None
         async with httpx.AsyncClient(timeout=90) as client:
-            response = await client.post(url, headers=headers, json=payload)
+            for attempt in range(3):
+                response = await client.post(url, headers=headers, json=payload)
+                if response.status_code != 429 and response.status_code < 500:
+                    break
+                if attempt < 2:
+                    retry_after = response.headers.get("retry-after", "")
+                    delay = (
+                        float(retry_after)
+                        if retry_after.replace(".", "", 1).isdigit()
+                        else 2**attempt
+                    )
+                    await asyncio.sleep(min(delay, 8))
+        assert response is not None
         if response.is_error:
             raise ProviderError(f"{self.name} {response.status_code}: {response.text[:300]}")
         data = response.json()
@@ -96,6 +110,11 @@ def build_provider(vendor: str, settings: Settings, role: str = "") -> Provider:
         # Per-role key (GEMINI_API_KEY_BACKEND etc.) wins; falls back to GEMINI_API_KEY.
         key = getattr(settings, f"gemini_api_key_{role}", None) or settings.gemini_api_key or ""
         return GeminiProvider(key, settings.gemini_model, settings.gemini_base_url)
+    if vendor == "huggingface":
+        key = settings.huggingface_api_key or settings.hf_token or ""
+        role_model = getattr(settings, f"huggingface_model_{role}", None)
+        model = role_model or settings.huggingface_model
+        return OpenAICompatibleProvider("huggingface", key, model, settings.huggingface_base_url)
     if vendor in OPENAI_COMPATIBLE:
         default_url, default_model = OPENAI_COMPATIBLE[vendor]
         key = getattr(settings, f"{vendor}_api_key", "") or ""
@@ -105,8 +124,7 @@ def build_provider(vendor: str, settings: Settings, role: str = "") -> Provider:
 
 
 def build_agent_providers(settings: Settings) -> dict[str, Provider]:
-    """One provider per agent role. Roles whose provider fails to build are omitted;
-    the runner falls back to a scripted response for those, so one bad key never kills a run."""
+    """Build configured role providers; invalid or incomplete roles remain unavailable."""
     wanted = {
         "backend": settings.backend_provider,
         "frontend": settings.frontend_provider,
