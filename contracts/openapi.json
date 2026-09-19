@@ -295,6 +295,71 @@
         }
       }
     },
+    "/traces": {
+      "get": {
+        "tags": [
+          "tracing"
+        ],
+        "summary": "Recent",
+        "operationId": "recent_traces_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TraceEvent"
+                  },
+                  "title": "Response Recent Traces Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/live/config": {
       "get": {
         "tags": [
@@ -779,6 +844,11 @@
             "type": "string",
             "title": "Memory Mode"
           },
+          "trace_mode": {
+            "type": "string",
+            "title": "Trace Mode",
+            "default": "cache"
+          },
           "live_integrations": {
             "type": "boolean",
             "title": "Live Integrations",
@@ -917,6 +987,88 @@
           "status"
         ],
         "title": "TestResult"
+      },
+      "TraceEvent": {
+        "properties": {
+          "trace_id": {
+            "type": "string",
+            "title": "Trace Id"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "coordinator",
+              "live_agent"
+            ],
+            "title": "Source"
+          },
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "objective_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objective Id"
+          },
+          "workstream_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workstream Id"
+          },
+          "agent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "trace_id",
+          "source",
+          "event_type",
+          "timestamp"
+        ],
+        "title": "TraceEvent",
+        "description": "Durable debugging record for coordinator and live-agent activity."
       },
       "ValidationError": {
         "properties": {

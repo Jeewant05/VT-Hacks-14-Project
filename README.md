@@ -35,6 +35,10 @@ Each role has its own provider and API key so calls can run independently. First
 
 Every proposed path is checked against its role (`backend/**`, `frontend/**`, or `integration/**`) before the coordinator writes it under `.local/live-runs/<run-id>`; generated code never edits the Synapse repository and is not executed automatically.
 
+## Databricks trace layer
+
+Set `TRACE_MODE=databricks` with `DATABRICKS_HOST`, `DATABRICKS_TOKEN`, `DATABRICKS_WAREHOUSE_ID`, `DATABRICKS_CATALOG`, and `DATABRICKS_SCHEMA` to persist coordinator and live-agent events. Create the destination from [the trace schema](docs/databricks-trace-schema.sql). `GET /traces` reads the newest records; `GET /traces?run_id=run-…` filters a live run. Incomplete settings safely retain the in-process cache trace store.
+
 ## Commands
 
 | Command | Purpose |

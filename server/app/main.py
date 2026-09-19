@@ -10,6 +10,8 @@ from server.app.providers import build_agent_providers
 from server.app.routes import build_router
 from server.app.service import Coordinator
 from server.app.store import read_state
+from server.app.trace_routes import build_trace_router
+from server.app.tracing import build_trace_sink
 
 
 def _fresh_state() -> WorkspaceState:
@@ -44,8 +46,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
+    trace = build_trace_sink(settings)
     coordinator = Coordinator(
-        settings.resolved_database_path, build_identity(settings), build_memory(settings)
+        settings.resolved_database_path, build_identity(settings), build_memory(settings), trace
     )
 
     @app.get("/health", response_model=Health)
@@ -53,6 +56,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return Health(
             identity_mode=settings.identity_mode,
             memory_mode=settings.memory_mode,
+            trace_mode=trace.source,
             live_integrations=settings.live_integrations,
         )
 
@@ -61,6 +65,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return read_state(settings.resolved_database_path)
 
     app.include_router(build_router(coordinator, _fresh_state))
+    app.include_router(build_trace_router(trace))
     configured = build_agent_providers(settings)
     providers = {
         role: configured[source]
@@ -71,7 +76,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         }.items()
         if source in configured
     }
-    runs = LiveRuns(providers, settings.resolved_database_path.parent / "live-runs")
+    runs = LiveRuns(providers, settings.resolved_database_path.parent / "live-runs", trace)
     app.include_router(build_live_router(runs, settings.gemini_model))
     return app
 

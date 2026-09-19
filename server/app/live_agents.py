@@ -2,13 +2,18 @@
 
 import asyncio
 import json
+import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from server.app.models import TraceEvent
 from server.app.providers import Provider
+from server.app.tracing import TraceSink
+
+log = logging.getLogger("synapse")
 
 
 @dataclass(frozen=True)
@@ -62,6 +67,7 @@ class LiveRun:
     objective: str
     root: Path
     providers: dict[str, Provider]
+    trace: TraceSink | None = None
     events: list[dict[str, Any]] = field(default_factory=list)
     artifacts: list[Artifact] = field(default_factory=list)
     intentions: dict[str, str] = field(default_factory=dict)
@@ -70,15 +76,31 @@ class LiveRun:
     task: asyncio.Task[None] | None = None
 
     def emit(self, agent: str, event_type: str, message: str, **extra: Any) -> None:
-        self.events.append(
-            {
-                "agent_id": agent,
-                "event_type": event_type,
-                "message": message,
-                "timestamp": datetime.now(UTC).isoformat(),
-                **extra,
-            }
-        )
+        event = {
+            "agent_id": agent,
+            "event_type": event_type,
+            "message": message,
+            "timestamp": datetime.now(UTC).isoformat(),
+            **extra,
+        }
+        self.events.append(event)
+        if self.trace:
+            asyncio.create_task(self._trace(event))
+
+    async def _trace(self, event: dict[str, Any]) -> None:
+        if self.trace is None:
+            return
+        try:
+            await self.trace.log(TraceEvent(
+                trace_id=f"trace-{uuid.uuid4().hex}", source="live_agent",
+                event_type=event["event_type"], timestamp=event["timestamp"], run_id=self.run_id,
+                agent_id=event["agent_id"], payload={
+                    "message": event["message"],
+                    **{key: value for key, value in event.items() if key not in {"agent_id", "event_type", "message", "timestamp"}},
+                },
+            ))
+        except Exception as exc:  # noqa: BLE001 - tracing must never stop a run
+            log.warning("live trace.log failed: %s", exc)
 
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -263,8 +285,8 @@ absolute paths, parent-directory traversal, or files outside your assigned direc
 
 
 class LiveRuns:
-    def __init__(self, providers: dict[str, Provider], root: Path):
-        self.providers, self.root = providers, root
+    def __init__(self, providers: dict[str, Provider], root: Path, trace: TraceSink):
+        self.providers, self.root, self.trace = providers, root, trace
         self.runs: dict[str, LiveRun] = {}
 
     @property
@@ -285,7 +307,7 @@ class LiveRuns:
         if len(objective) > MAX_OBJECTIVE_CHARS:
             raise ValueError(f"objective must be at most {MAX_OBJECTIVE_CHARS} characters")
         run_id = f"run-{uuid.uuid4().hex[:8]}"
-        run = LiveRun(run_id, objective, self.root / run_id, self.providers)
+        run = LiveRun(run_id, objective, self.root / run_id, self.providers, self.trace)
         self.runs[run_id] = run
         run.task = asyncio.create_task(run.execute())
         return run

@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ROOT / ".env", extra="ignore")
     identity_mode: Literal["mock", "ans"] = "mock"
     memory_mode: Literal["cache", "databricks"] = "cache"
+    trace_mode: Literal["cache", "databricks"] = "cache"
     database_path: Path = Path(".local/synapse.db")
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
@@ -47,10 +48,17 @@ class Settings(BaseSettings):
     databricks_warehouse_id: str = ""
     databricks_catalog: str = ""
     databricks_schema: str = ""
+    databricks_trace_table: str = "synapse_agent_traces"
 
     @property
     def resolved_database_path(self) -> Path:
         return ROOT / self.database_path
+
+    @property
+    def databricks_trace_table_name(self) -> str:
+        if not self.databricks_catalog or not self.databricks_schema:
+            return self.databricks_trace_table
+        return f"{self.databricks_catalog}.{self.databricks_schema}.{self.databricks_trace_table}"
 
     @property
     def live_agents_enabled(self) -> bool:

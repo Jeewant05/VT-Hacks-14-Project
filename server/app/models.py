@@ -85,6 +85,20 @@ class Event(BaseModel):
     timestamp: str
 
 
+class TraceEvent(BaseModel):
+    """Durable debugging record for coordinator and live-agent activity."""
+
+    trace_id: str
+    source: Literal["coordinator", "live_agent"]
+    event_type: str
+    timestamp: str
+    run_id: str | None = None
+    objective_id: str | None = None
+    workstream_id: str | None = None
+    agent_id: str | None = None
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
 class VerificationResult(BaseModel):
     agent_id: str
     verified: bool
@@ -103,6 +117,7 @@ class Health(BaseModel):
     status: Literal["ok"] = "ok"
     identity_mode: str
     memory_mode: str
+    trace_mode: str = "cache"
     live_integrations: bool = False
 
 
