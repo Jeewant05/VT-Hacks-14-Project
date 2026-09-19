@@ -9,43 +9,63 @@ from server.app.main import create_app
 
 
 class FakeGemini:
-    def __init__(self, invalid_frontend: bool = False):
-        self.invalid_frontend = invalid_frontend
+    def __init__(self, role: str, invalid_path: bool = False):
+        self.role = role
+        self.invalid_path = invalid_path
         self.prompts: list[str] = []
 
     async def generate(self, prompt: str) -> str:
         self.prompts.append(prompt)
-        if "Backend agent" in prompt:
-            return json.dumps(
-                {
-                    "report": "Built the item API.",
-                    "files": [{"path": "backend/app.py", "content": "def items(): return []\n"}],
-                }
-            )
-        if "Frontend agent" in prompt:
-            path = "backend/stolen.py" if self.invalid_frontend else "frontend/App.tsx"
-            return json.dumps(
-                {
-                    "report": "Built the task list.",
-                    "files": [{"path": path, "content": "export function App() { return null }\n"}],
-                }
-            )
-        return json.dumps(
-            {
+        if "Do not write code yet" in prompt:
+            return json.dumps({"intention": f"{self.role} will implement its owned deliverable"})
+        responses = {
+            "backend": {
+                "report": "Built the item API.",
+                "files": [{"path": "backend/app.py", "content": "def items(): return []\n"}],
+            },
+            "frontend": {
+                "report": "Built the task list.",
+                "files": [
+                    {
+                        "path": "backend/stolen.py" if self.invalid_path else "frontend/App.tsx",
+                        "content": "export function App() { return null }\n",
+                    }
+                ],
+            },
+            "integration": {
                 "report": "Added the contract handoff.",
                 "files": [{"path": "integration/README.md", "content": "# Integration\n"}],
-            }
-        )
+            },
+        }
+        return json.dumps(responses[self.role])
 
 
-def test_three_agents_generate_scoped_project(tmp_path):
-    provider = FakeGemini()
-    run = LiveRun("run-test", "Build tasks", tmp_path / "run-test", provider)
+def providers(invalid_frontend: bool = False):
+    return {
+        "backend": FakeGemini("backend"),
+        "frontend": FakeGemini("frontend", invalid_frontend),
+        "integration": FakeGemini("integration"),
+    }
+
+
+def test_three_apis_plan_then_generate_scoped_project(tmp_path):
+    agent_providers = providers()
+    run = LiveRun("run-test", "Build tasks", tmp_path / "run-test", agent_providers)
 
     asyncio.run(run.execute())
 
     assert run.status == "complete"
-    assert len(provider.prompts) == 3
+    assert all(len(provider.prompts) == 2 for provider in agent_providers.values())
+    assert run.intentions == {
+        "backend": "backend will implement its owned deliverable",
+        "frontend": "frontend will implement its owned deliverable",
+        "integration": "integration will implement its owned deliverable",
+    }
+    implementation_prompts = [provider.prompts[1] for provider in agent_providers.values()]
+    assert all(
+        all(intention in prompt for intention in run.intentions.values())
+        for prompt in implementation_prompts
+    )
     assert {item.agent_id for item in run.artifacts} == {
         "coordinator",
         "backend",
@@ -58,9 +78,9 @@ def test_three_agents_generate_scoped_project(tmp_path):
     assert run.events[-1]["event_type"] == "run_complete"
 
 
-def test_agent_cannot_escape_its_owned_directory(tmp_path):
+def test_invalid_proposal_commits_no_files(tmp_path):
     run = LiveRun(
-        "run-invalid", "Build tasks", tmp_path / "run-invalid", FakeGemini(invalid_frontend=True)
+        "run-invalid", "Build tasks", tmp_path / "run-invalid", providers(invalid_frontend=True)
     )
 
     asyncio.run(run.execute())
@@ -68,10 +88,11 @@ def test_agent_cannot_escape_its_owned_directory(tmp_path):
     assert run.status == "failed"
     assert run.events[-1]["event_type"] == "run_failed"
     assert "outside frontend/" in run.events[-1]["message"]
-    assert not (run.root / "backend/stolen.py").exists()
+    assert run.artifacts == []
+    assert list(run.root.rglob("*")) == []
 
 
-def test_live_config_is_available_without_a_gemini_key(tmp_path):
+def test_live_config_reports_each_missing_api(tmp_path):
     client = TestClient(create_app(Settings(database_path=tmp_path / "state.db")))
 
     config = client.get("/live/config")
@@ -79,5 +100,6 @@ def test_live_config_is_available_without_a_gemini_key(tmp_path):
 
     assert config.status_code == 200
     assert config.json()["configured"] is False
-    assert [role["id"] for role in config.json()["roles"]] == ["backend", "frontend", "integration"]
+    assert [role["configured"] for role in config.json()["roles"]] == [False, False, False]
     assert start.status_code == 503
+    assert "backend, frontend, integration" in start.json()["detail"]

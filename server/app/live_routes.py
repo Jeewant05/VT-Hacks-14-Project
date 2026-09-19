@@ -26,7 +26,12 @@ def build_live_router(runs: LiveRuns, model: str) -> APIRouter:
             "configured": runs.configured,
             "model": model,
             "roles": [
-                {"id": role.id, "title": role.title, "responsibility": role.responsibility}
+                {
+                    "id": role.id,
+                    "title": role.title,
+                    "responsibility": role.responsibility,
+                    "configured": role.id in runs.configured_roles,
+                }
                 for role in ROLES
             ],
         }

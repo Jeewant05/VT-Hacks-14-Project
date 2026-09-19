@@ -1,8 +1,4 @@
-"""Bounded three-agent Gemini coding runs.
-
-Gemini may propose files, but only this coordinator validates and writes them.
-Generated projects live under ``.local/live-runs`` and never touch this repository.
-"""
+"""Bounded three-agent Gemini coding runs with plan-before-write coordination."""
 
 import asyncio
 import json
@@ -45,7 +41,7 @@ ROLES = (
         "integration",
     ),
 )
-
+ROLE_BY_ID = {role.id: role for role in ROLES}
 MAX_OBJECTIVE_CHARS = 2_000
 MAX_FILES_PER_AGENT = 6
 MAX_FILE_CHARS = 50_000
@@ -67,9 +63,10 @@ class LiveRun:
     run_id: str
     objective: str
     root: Path
-    provider: TextProvider
+    providers: dict[str, TextProvider]
     events: list[dict[str, Any]] = field(default_factory=list)
     artifacts: list[Artifact] = field(default_factory=list)
+    intentions: dict[str, str] = field(default_factory=dict)
     reports: dict[str, str] = field(default_factory=dict)
     status: str = "queued"
     task: asyncio.Task[None] | None = None
@@ -91,40 +88,43 @@ class LiveRun:
             "objective": self.objective,
             "status": self.status,
             "artifacts": [artifact.as_dict() for artifact in self.artifacts],
+            "intentions": self.intentions,
             "reports": self.reports,
         }
 
     async def execute(self) -> None:
-        self.status = "running"
+        self.status = "planning"
         self.root.mkdir(parents=True, exist_ok=False)
         self.emit("coordinator", "run_started", "Created an isolated project workspace")
         contract = self._contract()
-        self._write(
-            Artifact(
-                path="shared/api-contract.json",
-                agent_id="coordinator",
-                content=json.dumps(contract, indent=2) + "\n",
-            )
-        )
-        self.emit("coordinator", "contract_published", "Published the shared API contract")
 
         try:
-            backend, frontend = await asyncio.gather(
-                self._ask(ROLES[0], contract), self._ask(ROLES[1], contract)
+            plans = await asyncio.gather(*(self._plan(role, contract) for role in ROLES))
+            self.intentions = {role.id: plan for role, plan in zip(ROLES, plans, strict=True)}
+            self.emit(
+                "coordinator", "intentions_shared", "Shared all three intentions with every agent"
             )
-            self._apply(ROLES[0], backend)
-            self._apply(ROLES[1], frontend)
-            integration_context = {
-                "contract": contract,
-                "generated_files": [
-                    {"path": item.path, "content": item.content[:8_000]}
-                    for item in self.artifacts
-                    if item.agent_id in {"backend", "frontend"}
-                ],
-            }
-            integration = await self._ask(ROLES[2], integration_context)
-            self._apply(ROLES[2], integration)
-            self._validate_run()
+
+            self.status = "building"
+            backend, frontend = await asyncio.gather(
+                self._build(ROLES[0], {"contract": contract}),
+                self._build(ROLES[1], {"contract": contract}),
+            )
+            staged = self._stage(ROLES[0], backend, [])
+            staged += self._stage(ROLES[1], frontend, staged)
+
+            integration = await self._build(
+                ROLES[2],
+                {
+                    "contract": contract,
+                    "generated_files": [
+                        {"path": item.path, "content": item.content[:8_000]} for item in staged
+                    ],
+                },
+            )
+            staged += self._stage(ROLES[2], integration, staged)
+            self._validate_staged(staged)
+            self._commit(contract, staged)
         except Exception as exc:  # noqa: BLE001 - failures belong in the live timeline
             self.status = "failed"
             self.emit("coordinator", "run_failed", str(exc)[:1_000])
@@ -134,37 +134,62 @@ class LiveRun:
         self.emit(
             "coordinator",
             "run_complete",
-            f"Validated {len(self.artifacts)} generated files across three agents",
+            f"Committed {len(staged)} agent files after intention and scope validation",
         )
 
-    async def _ask(self, role: AgentRole, context: dict[str, Any]) -> dict[str, Any]:
-        self.emit(role.id, "agent_started", f"{role.title} is generating its scoped changes")
+    async def _plan(self, role: AgentRole, contract: dict[str, Any]) -> str:
+        self.emit(role.id, "intention_started", f"{role.title} is planning before coding")
+        prompt = f"""You are the {role.title} planning your work before any files are written.
+Objective: {self.objective}
+Responsibility: {role.responsibility}
+Owned directory: {role.allowed_root}/
+Shared API contract: {json.dumps(contract)}
+
+Return JSON only: {{"intention":"a concise plan covering approach, files, dependencies, and validation"}}.
+Do not write code yet. Your intention will be shared with the other two agents.
+"""
+        raw = await self.providers[role.id].generate(prompt)
+        data = self._json(raw)
+        intention = data.get("intention")
+        if not isinstance(intention, str) or not intention.strip():
+            raise TypeError(f"{role.id} intention response is invalid")
+        intention = intention.strip()[:3_000]
+        self.emit(role.id, "intention_ready", intention)
+        return intention
+
+    async def _build(self, role: AgentRole, context: dict[str, Any]) -> dict[str, Any]:
+        self.emit(role.id, "agent_started", f"{role.title} is implementing its intention")
         prompt = f"""You are the {role.title} in a coordinated coding demo.
 Objective: {self.objective}
 Responsibility: {role.responsibility}
 You may create files only inside the `{role.allowed_root}/` directory.
 
+Intentions agreed before implementation (use these to avoid conflicts):
+{json.dumps(self.intentions, indent=2)}
+
 Shared project context:
 {json.dumps(context, indent=2)}
 
 Return JSON only, without markdown fences, using this exact shape:
-{{
-  "report": "short explanation of the implementation",
-  "files": [{{"path": "{role.allowed_root}/relative-name", "content": "complete file contents"}}]
-}}
-Create a small, coherent, runnable implementation. Do not include secrets, shell commands,
+{{"report":"short implementation summary","files":[{{"path":"{role.allowed_root}/relative-name","content":"complete file contents"}}]}}
+Create a small, coherent implementation aligned with all three intentions. Do not include secrets,
 absolute paths, parent-directory traversal, or files outside your assigned directory.
 """
-        raw = await self.provider.generate(prompt)
-        proposal = self._parse(raw)
+        raw = await self.providers[role.id].generate(prompt)
+        proposal = self._json(raw)
+        if not isinstance(proposal.get("report"), str) or not isinstance(
+            proposal.get("files"), list
+        ):
+            raise TypeError(f"{role.id} response must contain report and files")
         self.emit(role.id, "proposal_received", proposal["report"][:1_000])
         return proposal
 
-    def _apply(self, role: AgentRole, proposal: dict[str, Any]) -> None:
+    def _stage(
+        self, role: AgentRole, proposal: dict[str, Any], existing: list[Artifact]
+    ) -> list[Artifact]:
         files = proposal["files"]
         if not files or len(files) > MAX_FILES_PER_AGENT:
             raise ValueError(f"{role.id} must return 1-{MAX_FILES_PER_AGENT} files")
-
         pending: list[Artifact] = []
         for value in files:
             if not isinstance(value, dict):
@@ -182,35 +207,43 @@ absolute paths, parent-directory traversal, or files outside your assigned direc
                 raise ValueError(f"{role.id} attempted to write outside {role.allowed_root}/")
             if len(content) > MAX_FILE_CHARS:
                 raise ValueError(f"{path} exceeds the per-file size limit")
-            if any(item.path == normalized.as_posix() for item in self.artifacts + pending):
+            if any(item.path == normalized.as_posix() for item in existing + pending):
                 raise ValueError(f"duplicate generated path: {normalized.as_posix()}")
             pending.append(Artifact(normalized.as_posix(), role.id, content))
-
-        if sum(len(item.content) for item in self.artifacts + pending) > MAX_TOTAL_CHARS:
-            raise ValueError("generated project exceeds the run size limit")
-        for artifact in pending:
-            self._write(artifact)
-            self.emit(role.id, "file_written", artifact.path, path=artifact.path)
         self.reports[role.id] = proposal["report"][:2_000]
-        self.emit(role.id, "agent_complete", f"Created {len(pending)} scoped files")
+        self.emit(role.id, "proposal_staged", f"Staged {len(pending)} files; nothing written yet")
+        return pending
+
+    def _validate_staged(self, staged: list[Artifact]) -> None:
+        missing = {role.id for role in ROLES} - {item.agent_id for item in staged}
+        if missing:
+            raise ValueError(f"missing deliverables from: {', '.join(sorted(missing))}")
+        if sum(len(item.content) for item in staged) > MAX_TOTAL_CHARS:
+            raise ValueError("generated project exceeds the run size limit")
+        self.emit(
+            "coordinator",
+            "validation_passed",
+            "Intentions, ownership, paths, duplicates, and size checks passed",
+        )
+
+    def _commit(self, contract: dict[str, Any], staged: list[Artifact]) -> None:
+        self._write(
+            Artifact(
+                "shared/api-contract.json", "coordinator", json.dumps(contract, indent=2) + "\n"
+            )
+        )
+        self.emit(
+            "coordinator", "contract_committed", "Committed the coordinator-owned API contract"
+        )
+        for artifact in staged:
+            self._write(artifact)
+            self.emit(artifact.agent_id, "file_committed", artifact.path, path=artifact.path)
 
     def _write(self, artifact: Artifact) -> None:
         destination = self.root.joinpath(*PurePosixPath(artifact.path).parts)
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(artifact.content, encoding="utf-8")
         self.artifacts.append(artifact)
-
-    def _validate_run(self) -> None:
-        owners = {item.agent_id for item in self.artifacts}
-        missing = {role.id for role in ROLES} - owners
-        if missing:
-            raise ValueError(f"missing deliverables from: {', '.join(sorted(missing))}")
-        paths = [item.path for item in self.artifacts]
-        if len(paths) != len(set(paths)):
-            raise ValueError("two agents proposed the same path")
-        self.emit(
-            "coordinator", "validation_passed", "Ownership, path, duplicate, and size checks passed"
-        )
 
     @staticmethod
     def _contract() -> dict[str, Any]:
@@ -221,39 +254,40 @@ absolute paths, parent-directory traversal, or files outside your assigned direc
         }
 
     @staticmethod
-    def _parse(raw: str) -> dict[str, Any]:
+    def _json(raw: str) -> dict[str, Any]:
         value = raw.strip()
         if value.startswith("```"):
             value = value.split("\n", 1)[1].rsplit("```", 1)[0]
         data = json.loads(value)
         if not isinstance(data, dict):
             raise TypeError("Gemini response must be a JSON object")
-        if not isinstance(data.get("report"), str) or not isinstance(data.get("files"), list):
-            raise TypeError("Gemini response must contain report and files")
         return data
 
 
 class LiveRuns:
-    def __init__(self, provider: TextProvider | None, root: Path):
-        self.provider, self.root = provider, root
+    def __init__(self, providers: dict[str, TextProvider], root: Path):
+        self.providers, self.root = providers, root
         self.runs: dict[str, LiveRun] = {}
 
     @property
     def configured(self) -> bool:
-        return self.provider is not None
+        return all(role.id in self.providers for role in ROLES)
+
+    @property
+    def configured_roles(self) -> set[str]:
+        return set(self.providers)
 
     def start(self, objective: str) -> LiveRun:
-        if self.provider is None:
-            raise RuntimeError(
-                "Gemini is not configured. Set AGENT_PROVIDER=gemini and GEMINI_API_KEY."
-            )
+        missing = [role.id for role in ROLES if role.id not in self.providers]
+        if missing:
+            raise RuntimeError(f"Missing Gemini API configuration for: {', '.join(missing)}")
         objective = objective.strip()
         if not objective:
             raise ValueError("objective cannot be empty")
         if len(objective) > MAX_OBJECTIVE_CHARS:
             raise ValueError(f"objective must be at most {MAX_OBJECTIVE_CHARS} characters")
         run_id = f"run-{uuid.uuid4().hex[:8]}"
-        run = LiveRun(run_id, objective, self.root / run_id, self.provider)
+        run = LiveRun(run_id, objective, self.root / run_id, self.providers)
         self.runs[run_id] = run
         run.task = asyncio.create_task(run.execute())
         return run

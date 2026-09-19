@@ -24,10 +24,14 @@ To run the live demo, add these values to `.env` before starting the app:
 
 ```sh
 AGENT_PROVIDER=gemini
-GEMINI_API_KEY=your-key
+GEMINI_BACKEND_API_KEY=your-backend-key
+GEMINI_FRONTEND_API_KEY=your-frontend-key
+GEMINI_INTEGRATION_API_KEY=your-integration-key
 ```
 
-The live flow starts three specialized Gemini calls. The backend and frontend agents build against the same coordinator-owned API contract in parallel. The integration agent then reviews both outputs and produces tests or handoff assets. Every proposed path is checked against its role (`backend/**`, `frontend/**`, or `integration/**`) before the coordinator writes it under `.local/live-runs/<run-id>`; generated code never edits the Synapse repository and is not executed automatically.
+Each role has its own provider and API key so calls can run independently. First, all three agents generate an intention in parallel. The coordinator shares those intentions with every agent, then starts implementation: backend and frontend build concurrently, and integration reviews their staged output. Nothing is written until every proposal passes ownership, path, duplicate, and size validation. The legacy `GEMINI_API_KEY` remains available as a single-key fallback, but separate keys are recommended for the concurrent demo.
+
+Every proposed path is checked against its role (`backend/**`, `frontend/**`, or `integration/**`) before the coordinator writes it under `.local/live-runs/<run-id>`; generated code never edits the Synapse repository and is not executed automatically.
 
 ## Commands
 

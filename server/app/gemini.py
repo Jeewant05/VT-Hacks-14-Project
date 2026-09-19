@@ -21,8 +21,9 @@ class GeminiError(RuntimeError):
 
 
 class GeminiProvider:
-    def __init__(self, settings: Settings):
-        if not settings.gemini_api_key:
+    def __init__(self, settings: Settings, api_key: str | None = None):
+        self.api_key = api_key or settings.gemini_api_key
+        if not self.api_key:
             raise GeminiConfigurationError(
                 "Set GEMINI_API_KEY in .env before starting live agent mode."
             )
@@ -43,7 +44,7 @@ class GeminiProvider:
         async with httpx.AsyncClient(timeout=90) as client:
             response = await client.post(
                 url,
-                headers={"x-goog-api-key": self.settings.gemini_api_key},
+                headers={"x-goog-api-key": self.api_key},
                 json=payload,
             )
         if response.is_error:

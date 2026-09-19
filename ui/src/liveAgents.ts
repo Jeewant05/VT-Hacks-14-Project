@@ -10,14 +10,15 @@ export type LiveArtifact = { path: string; agent_id: string; content: string };
 export type LiveSnapshot = {
   run_id: string;
   objective: string;
-  status: 'queued' | 'running' | 'complete' | 'failed';
+  status: 'queued' | 'planning' | 'building' | 'complete' | 'failed';
   artifacts: LiveArtifact[];
+  intentions: Record<string, string>;
   reports: Record<string, string>;
 };
 export type LiveConfig = {
   configured: boolean;
   model: string;
-  roles: { id: string; title: string; responsibility: string }[];
+  roles: { id: string; title: string; responsibility: string; configured: boolean }[];
 };
 
 async function json<T>(response: Response): Promise<T> {

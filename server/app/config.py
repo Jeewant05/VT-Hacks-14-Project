@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     # Live agents (Hoai)
     agent_provider: Literal["none", "gemini"] = "none"
     gemini_api_key: str | None = None
+    gemini_backend_api_key: str | None = None
+    gemini_frontend_api_key: str | None = None
+    gemini_integration_api_key: str | None = None
     gemini_model: str = "gemini-2.5-flash"
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
 
@@ -40,5 +43,14 @@ class Settings(BaseSettings):
         return (
             self.identity_mode != "mock"
             or self.memory_mode != "cache"
-            or (self.agent_provider == "gemini" and bool(self.gemini_api_key))
+            or (self.agent_provider == "gemini" and any(self.gemini_agent_api_keys.values()))
         )
+
+    @property
+    def gemini_agent_api_keys(self) -> dict[str, str | None]:
+        """Use role-specific keys, with the legacy shared key as a local fallback."""
+        return {
+            "backend": self.gemini_backend_api_key or self.gemini_api_key,
+            "frontend": self.gemini_frontend_api_key or self.gemini_api_key,
+            "integration": self.gemini_integration_api_key or self.gemini_api_key,
+        }

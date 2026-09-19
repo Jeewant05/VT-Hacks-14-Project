@@ -30,8 +30,11 @@ export function LiveDashboard({ onSimulation }: Props) {
   const roleStatus = useMemo(() => Object.fromEntries(roleIds.map(role => {
     const roleEvents = events.filter(event => event.agent_id === role);
     const latest = roleEvents.at(-1)?.event_type;
-    if (latest === 'agent_complete') return [role, 'Complete'];
-    if (latest === 'agent_started' || latest === 'proposal_received' || latest === 'file_written') return [role, 'Working'];
+    if (latest === 'file_committed') return [role, 'Committed'];
+    if (latest === 'proposal_staged') return [role, 'Ready to commit'];
+    if (latest === 'intention_ready') return [role, 'Intention ready'];
+    if (latest === 'intention_started') return [role, 'Planning'];
+    if (latest === 'agent_started' || latest === 'proposal_received') return [role, 'Building'];
     return [role, 'Waiting'];
   })), [events]);
 
@@ -76,8 +79,8 @@ export function LiveDashboard({ onSimulation }: Props) {
     <section className="prompt-card">
       <div className="prompt-heading"><div><label htmlFor="objective">Project objective</label><small>{config ? `${config.model} · ${config.configured ? 'ready' : 'setup required'}` : 'Checking configuration…'}</small></div>{run && <span className={`run-status status-${run.status}`}>{run.status}</span>}</div>
       <textarea id="objective" value={objective} maxLength={2000} onChange={event => setObjective(event.target.value)} disabled={busy || !!run} />
-      <div className="prompt-actions"><button className="primary" onClick={start} disabled={busy || !!run || !config?.configured}>{busy ? 'Starting…' : 'Start three Gemini agents'}</button>{run && <button className="secondary" onClick={reset} disabled={run.status === 'running'}>New run</button>}<span>Generated code stays in an isolated local run directory.</span></div>
-      {config && !config.configured && <div className="setup-note"><strong>Gemini setup needed.</strong> Set <code>AGENT_PROVIDER=gemini</code> and <code>GEMINI_API_KEY</code> in <code>.env</code>, then restart the API. The guided simulation works without credentials.</div>}
+      <div className="prompt-actions"><button className="primary" onClick={start} disabled={busy || !!run || !config?.configured}>{busy ? 'Starting…' : 'Start three Gemini agents'}</button>{run && <button className="secondary" onClick={reset} disabled={run.status === 'planning' || run.status === 'building'}>New run</button>}<span>Generated code stays in an isolated local run directory.</span></div>
+      {config && !config.configured && <div className="setup-note"><strong>Three Gemini APIs needed.</strong> Set <code>AGENT_PROVIDER=gemini</code> plus <code>GEMINI_BACKEND_API_KEY</code>, <code>GEMINI_FRONTEND_API_KEY</code>, and <code>GEMINI_INTEGRATION_API_KEY</code> in <code>.env</code>, then restart the API.</div>}
     </section>
 
     {error && <div className="error-card"><strong>Live run error</strong><pre>{error}</pre></div>}
@@ -85,7 +88,7 @@ export function LiveDashboard({ onSimulation }: Props) {
     <section className="live-agent-grid">{roleIds.map(agent => {
       const details = config?.roles.find(role => role.id === agent);
       const count = artifacts.filter(item => item.agent_id === agent).length;
-      return <article className={`agent-card-live state-${roleStatus[agent].toLowerCase()}`} key={agent}><div className="agent-dot" /><div><h2>{details?.title ?? agent}</h2><p>{details?.responsibility}</p><small>{roleStatus[agent]}{count ? ` · ${count} file${count === 1 ? '' : 's'}` : ''}</small></div></article>;
+      return <article className={`agent-card-live state-${roleStatus[agent].toLowerCase().replaceAll(' ', '-')}`} key={agent}><div className="agent-dot" /><div><h2>{details?.title ?? agent}<span className={details?.configured ? 'api-ready' : 'api-missing'}>{details?.configured ? 'API ready' : 'API missing'}</span></h2><p>{details?.responsibility}</p>{run?.intentions[agent] && <blockquote className="agent-intention"><b>Intention</b>{run.intentions[agent]}</blockquote>}<small>{roleStatus[agent]}{count ? ` · ${count} file${count === 1 ? '' : 's'}` : ''}</small></div></article>;
     })}</section>
 
     <section className="live-workspace">
