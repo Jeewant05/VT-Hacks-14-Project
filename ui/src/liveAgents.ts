@@ -1,4 +1,4 @@
-"""Utilities for connecting the live-agent UI to the coordinator."""
+// Utilities for connecting the live-agent UI to the coordinator.
 
 export type LiveEvent = {
   agent_id: string;
