@@ -12,7 +12,7 @@ The user accepts the Databricks-backed contract correction in the labeled simula
 
 ## Boundaries
 
-The current HTTP API is read-only. Demo state is local and isolated from backend state. Repository file previews are illustrative manifests and excerpts, not actual Git diffs. Identity evidence, decisions, and test results identify their source. Keep real provider integration and coordinator endpoints outside this frontend milestone.
+The local coordinator API is authoritative for demo state. Repository file previews remain illustrative excerpts, while submitted file paths and agent-reported tests are persisted in the coordinator ChangeSets. Identity and memory evidence identify the mock/cache adapter source. Keep real sponsor-provider integration outside this frontend milestone.
 
 ## Composition and behavior
 

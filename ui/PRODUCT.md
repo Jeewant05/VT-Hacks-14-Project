@@ -20,7 +20,7 @@ One prepared objective: add organization-level OAuth login. The backend provides
 
 ## Capabilities and Constraints
 
-React/TypeScript frontend, FastAPI backend. The existing backend only exposes health and seeded workspace state. This frontend milestone implements an explicitly labeled interactive simulation and a separate read-only backend view. No simulated identity, event delivery, code change, or test result is real sponsor evidence. ANS and Databricks integrations remain required future work. No automatic merge, deployment, production accounts, or arbitrary repository browsing.
+React/TypeScript frontend, FastAPI backend. The guided workspace calls the local coordinator for reset, agent join, workstream claim, contract declaration, correction, and ChangeSet submission. GoDaddy identity and Databricks memory still use mock/cache adapters, so no identity or memory result is live sponsor evidence. No automatic merge, deployment, production accounts, or arbitrary repository browsing.
 
 ## Brand Commitments
 

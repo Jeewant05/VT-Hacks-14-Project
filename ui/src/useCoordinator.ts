@@ -1,0 +1,173 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { components } from './api.generated';
+import { initialDemo, type DemoEvent, type DemoState, type Phase } from './demo';
+
+export type WorkspaceState = components['schemas']['WorkspaceState'];
+export type Health = components['schemas']['Health'];
+type ApiContract = components['schemas']['ApiContract'];
+type ChangeSet = components['schemas']['ChangeSet'];
+type PendingAction = 'start' | 'correct' | 'submit' | 'reset' | null;
+
+const approvedFields = { token: 'string', user: 'object' };
+const incompatibleFields = { accessToken: 'string', profile: 'object' };
+
+const contract = (role: 'provides' | 'consumes', fields: Record<string, string>): ApiContract => ({
+  method: 'POST', path: '/api/oauth', role, request_fields: {}, response_fields: fields,
+});
+
+function eventPresentation(event: NonNullable<WorkspaceState['events']>[number], index: number): DemoEvent {
+  const source = typeof event.payload?.source === 'string' ? event.payload.source : 'coordinator';
+  const definitions: Record<string, Omit<DemoEvent, 'id' | 'time'>> = {
+    agent_joined: { title: 'Agent identity checked', detail: `${event.agent_id ?? 'Agent'} accepted by ${source}.`, tone: 'success', evidence: 'identity' },
+    agent_rejected: { title: 'Agent rejected', detail: `${event.agent_id ?? 'Unknown agent'} could not join.`, tone: 'warning', evidence: 'identity' },
+    workstream_claimed: { title: 'Workstream claimed', detail: `${event.workstream_id ?? 'Workstream'} scope assigned.`, tone: 'neutral' },
+    contract_declared: { title: 'Contract declared', detail: `${event.workstream_id ?? 'Workstream'} declared POST /api/oauth.`, tone: 'neutral', evidence: 'contract' },
+    conflict_opened: { title: 'Contract mismatch detected', detail: 'Convergence blocked; project decision attached.', tone: 'warning', evidence: 'contract' },
+    conflict_resolved: { title: 'Contract conflict resolved', detail: 'Both workstreams now declare token + user.', tone: 'success', evidence: 'contract' },
+    changeset_rejected: { title: 'ChangeSet rejected', detail: 'An open conflict prevented submission.', tone: 'warning', evidence: 'contract' },
+    changeset_submitted: { title: 'ChangeSet submitted', detail: `${event.workstream_id ?? 'Workstream'} manifest and test report accepted.`, tone: 'success', evidence: 'tests' },
+    workstream_completed: { title: 'Workstream complete', detail: `${event.workstream_id ?? 'Workstream'} is ready for review.`, tone: 'success' },
+    objective_completed: { title: 'Ready for Convergence review', detail: 'Two compatible ChangeSets. No open conflicts.', tone: 'success', evidence: 'tests' },
+  };
+  const fallback = { title: event.event_type.replaceAll('_', ' '), detail: 'Coordinator event recorded.', tone: 'neutral' as const };
+  const rendered = definitions[event.event_type] ?? fallback;
+  const time = new Date(event.timestamp).toLocaleTimeString([], { minute: '2-digit', second: '2-digit' });
+  return { id: event.event_id || `${event.event_type}-${index}`, time, ...rendered };
+}
+
+export function workspaceToDemo(state: WorkspaceState | null, pending: PendingAction = null): DemoState {
+  if (!state) return initialDemo;
+  const events = state.events ?? [];
+  const openConflict = (state.conflicts ?? []).some(item => item.status === 'open');
+  const verifiedCount = (state.agents ?? []).filter(agent => agent.verified).length;
+  const resolved = events.some(event => event.event_type === 'conflict_resolved');
+  let phase: Phase = 'ready';
+
+  if (state.objective?.status === 'complete') phase = 'complete';
+  else if (pending === 'submit') phase = 'submitting';
+  else if (pending === 'correct') phase = 'correcting';
+  else if (openConflict) phase = 'conflict';
+  else if (resolved) phase = 'aligned';
+  else if (pending === 'start' && verifiedCount === 2) phase = 'context';
+  else if (pending === 'start') phase = 'verifying';
+  else if (verifiedCount > 0) phase = 'context';
+
+  const presented = events.map(eventPresentation);
+  return {
+    phase,
+    events: presented.length ? presented : [{
+      id: 'objective', title: 'Objective created', detail: 'Two workstreams assigned to a shared objective.',
+      time: 'Ready', tone: 'neutral',
+    }],
+  };
+}
+
+async function parseResponse<T>(response: Response): Promise<T> {
+  if (response.ok) return response.json() as Promise<T>;
+  let detail = `Coordinator returned ${response.status}.`;
+  try {
+    const body = await response.json() as { detail?: string | { msg?: string }[] };
+    if (typeof body.detail === 'string') detail = body.detail;
+    else if (Array.isArray(body.detail)) detail = body.detail.map(item => item.msg).filter(Boolean).join(', ') || detail;
+  } catch { /* The HTTP status remains the useful recovery message. */ }
+  throw new Error(detail);
+}
+
+export function useCoordinator() {
+  const [workspace, setWorkspace] = useState<WorkspaceState | null>(null);
+  const [health, setHealth] = useState<Health | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingAction>(null);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const pendingRef = useRef<PendingAction>(null);
+
+  const setAction = (action: PendingAction) => { pendingRef.current = action; setPending(action); };
+
+  const request = useCallback(async <T,>(path: string, init?: RequestInit): Promise<T> => {
+    const response = await fetch(`/api${path}`, {
+      ...init,
+      headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
+    });
+    return parseResponse<T>(response);
+  }, []);
+
+  const refresh = useCallback(async () => {
+    try {
+      const [nextHealth, nextWorkspace] = await Promise.all([
+        request<Health>('/health'), request<WorkspaceState>('/state'),
+      ]);
+      if (nextHealth.status !== 'ok') throw new Error('Coordinator health response was invalid.');
+      if (!pendingRef.current) setWorkspace(nextWorkspace);
+      setHealth(nextHealth); setError(null); setUpdatedAt(new Date());
+      return true;
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'The local coordinator is unavailable.');
+      return false;
+    }
+  }, [request]);
+
+  useEffect(() => {
+    void refresh();
+    const timer = setInterval(() => { if (!pendingRef.current) void refresh(); }, 5000);
+    return () => clearInterval(timer);
+  }, [refresh]);
+
+  const post = useCallback(async (path: string, body?: unknown) => {
+    const next = await request<WorkspaceState>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) });
+    setWorkspace(next); setUpdatedAt(new Date());
+    return next;
+  }, [request]);
+
+  const perform = useCallback(async (action: Exclude<PendingAction, null>, task: () => Promise<void>) => {
+    setAction(action); setError(null);
+    try { await task(); return true; }
+    catch (failure) { setError(failure instanceof Error ? failure.message : 'Coordinator action failed.'); return false; }
+    finally { setAction(null); }
+  }, []);
+
+  const start = useCallback(() => perform('start', async () => {
+    await post('/reset');
+    await post('/agents/backend-agent/join');
+    await post('/agents/frontend-agent/join');
+    await post('/workstreams/backend/claim', { agent_id: 'backend-agent' });
+    await post('/workstreams/frontend/claim', { agent_id: 'frontend-agent' });
+    await post('/workstreams/backend/declare', { agent_id: 'backend-agent', contract: contract('provides', approvedFields) });
+    await post('/workstreams/frontend/declare', { agent_id: 'frontend-agent', contract: contract('consumes', incompatibleFields) });
+  }), [perform, post]);
+
+  const acceptCorrection = useCallback(() => perform('correct', async () => {
+    await post('/workstreams/frontend/declare', { agent_id: 'frontend-agent', contract: contract('consumes', approvedFields) });
+  }), [perform, post]);
+
+  const submit = useCallback(() => perform('submit', async () => {
+    const backend: ChangeSet = {
+      id: 'cs-backend-demo', workstream_id: 'backend', agent_id: 'backend-agent',
+      files: ['src/api/auth/oauth.ts', 'src/api/auth/oauth.test.ts'],
+      contract: contract('provides', approvedFields),
+      tests: [
+        { name: 'OAuth returns token and user', status: 'passed', source: 'agent_reported' },
+        { name: 'Organization context is required', status: 'passed', source: 'agent_reported' },
+      ],
+    };
+    const frontend: ChangeSet = {
+      id: 'cs-frontend-demo', workstream_id: 'frontend', agent_id: 'frontend-agent',
+      files: ['src/components/login/OrganizationLogin.tsx', 'src/components/login/OrganizationLogin.test.tsx'],
+      contract: contract('consumes', approvedFields),
+      tests: [
+        { name: 'Login consumes the approved response', status: 'passed', source: 'agent_reported' },
+        { name: 'Authenticated user is displayed', status: 'passed', source: 'agent_reported' },
+      ],
+    };
+    await post('/workstreams/backend/submit', backend);
+    await post('/workstreams/frontend/submit', frontend);
+  }), [perform, post]);
+
+  const reset = useCallback(() => perform('reset', async () => { await post('/reset'); }), [perform, post]);
+  const demo = useMemo(() => workspaceToDemo(workspace, pending), [workspace, pending]);
+
+  return {
+    workspace, health, demo, error, pending, updatedAt,
+    connected: Boolean(health), busy: pending !== null,
+    refresh, start, acceptCorrection, submit, reset,
+  };
+}
