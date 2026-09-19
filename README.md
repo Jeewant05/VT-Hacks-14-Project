@@ -16,7 +16,18 @@ npm run dev
 
 Open http://127.0.0.1:5173. The dashboard should show **Coordinator connected**, the prepared OAuth objective, and three pending workstreams. API documentation is at http://127.0.0.1:8000/docs. Stop both services with Ctrl+C.
 
-No sponsor credentials are required for setup. `IDENTITY_MODE=mock` and `MEMORY_MODE=cache` are the only implemented modes. Mock identity results are fixtures, not ANS verification. The memory adapter is an in-process development fixture, not durable Databricks delivery. Seeded decisions are local fixtures.
+No credentials are required for the guided simulation. Mock identity results are fixtures, not ANS verification, and seeded decisions are local fixtures.
+
+## Live Gemini coding demo
+
+To run the live demo, add these values to `.env` before starting the app:
+
+```sh
+AGENT_PROVIDER=gemini
+GEMINI_API_KEY=your-key
+```
+
+The live flow starts three specialized Gemini calls. The backend and frontend agents build against the same coordinator-owned API contract in parallel. The integration agent then reviews both outputs and produces tests or handoff assets. Every proposed path is checked against its role (`backend/**`, `frontend/**`, or `integration/**`) before the coordinator writes it under `.local/live-runs/<run-id>`; generated code never edits the Synapse repository and is not executed automatically.
 
 ## Commands
 
@@ -39,8 +50,8 @@ The database defaults to `.local/synapse.db`. Reset touches only local workspace
 | --- | --- | --- |
 | `server/` | API, models, SQLite, coordinator and integration interfaces | P1; P3/P4 implement their adapters |
 | `ui/` | React/TypeScript dashboard | P2 |
-| `agents/` | Future scripted clients and coding-agent instructions | P2 with P1 |
-| `demo-repo/` | Future small OAuth application and prepared changes | P2 |
+| `agents/` | Scripted coordinator clients and smoke checks | P2 with P1 |
+| `.local/live-runs/` | Ignored, isolated output from live Gemini runs | Coordinator |
 | `contracts/` | Generated schemas and sample state | P1 approves interface changes |
 | `scripts/` | Setup support, contracts, seed/reset, smoke check | P1 |
 | `docs/` | Scope, ownership, demo instructions | All |

@@ -1,37 +1,48 @@
-// Utilities for connecting the live-agent UI to the coordinator.
-
 export type LiveEvent = {
   agent_id: string;
   event_type: string;
   message: string;
-  version: number;
   timestamp: string;
-  base_version?: number;
+  path?: string;
 };
 
-export type LiveFile = { version: number; content: string; conflict_pending: boolean };
+export type LiveArtifact = { path: string; agent_id: string; content: string };
+export type LiveSnapshot = {
+  run_id: string;
+  objective: string;
+  status: 'queued' | 'running' | 'complete' | 'failed';
+  artifacts: LiveArtifact[];
+  reports: Record<string, string>;
+};
+export type LiveConfig = {
+  configured: boolean;
+  model: string;
+  roles: { id: string; title: string; responsibility: string }[];
+};
+
+async function json<T>(response: Response): Promise<T> {
+  if (!response.ok) throw new Error(await response.text());
+  return response.json() as Promise<T>;
+}
+
+export async function getLiveConfig(): Promise<LiveConfig> {
+  return json(await fetch('/api/live/config'));
+}
 
 export async function startLiveRun(objective: string): Promise<{ run_id: string; status: string }> {
-  const response = await fetch('/api/live/runs', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ objective }),
-  });
-  if (!response.ok) throw new Error(await response.text());
-  return response.json();
+  return json(await fetch('/api/live/runs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ objective }),
+  }));
+}
+
+export async function getLiveRun(runId: string): Promise<LiveSnapshot> {
+  return json(await fetch(`/api/live/runs/${runId}`));
 }
 
 export function subscribeLiveRun(runId: string, onEvent: (event: LiveEvent) => void): EventSource {
   const source = new EventSource(`/api/live/runs/${runId}/events`);
   source.onmessage = event => onEvent(JSON.parse(event.data) as LiveEvent);
   return source;
-}
-
-export async function approveLiveRun(runId: string): Promise<void> {
-  const response = await fetch(`/api/live/runs/${runId}/approve`, { method: 'POST' });
-  if (!response.ok) throw new Error(await response.text());
-}
-
-export async function getLiveFile(runId: string): Promise<LiveFile> {
-  const response = await fetch(`/api/live/runs/${runId}/file`);
-  if (!response.ok) throw new Error(await response.text());
-  return response.json();
 }

@@ -1,5 +1,15 @@
 # Demo runbook
 
+## Live three-agent Gemini demo
+
+1. Copy `.env.example` to `.env`, set `AGENT_PROVIDER=gemini` and `GEMINI_API_KEY`, then run `npm run setup` and `npm run dev`.
+2. Open the live dashboard, enter a small full-stack objective, and start the agents.
+3. Point out that backend and frontend begin together with exclusive directory ownership and one shared API contract.
+4. Watch their files appear, followed by the integration agent's review artifacts.
+5. Open generated files in the project browser and finish on the coordinator's ownership/path/size validation event.
+
+Be precise in the presentation: the displayed files are genuinely returned by Gemini and written to an isolated local run directory. Synapse validates boundaries, but it does not execute or commit generated code. Use the guided simulation when a Gemini key or network connection is unavailable.
+
 ## Foundation smoke check (available now)
 
 1. Copy `.env.example` to `.env` and run `npm run setup`.

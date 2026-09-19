@@ -60,13 +60,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return read_state(settings.resolved_database_path)
 
     app.include_router(build_router(coordinator, _fresh_state))
+    provider = None
     if settings.agent_provider == "gemini" and settings.gemini_api_key:
         from server.app.gemini import GeminiProvider
 
-        runs = LiveRuns(
-            GeminiProvider(settings), settings.resolved_database_path.parent / "live-runs"
-        )
-        app.include_router(build_live_router(runs))
+        provider = GeminiProvider(settings)
+    runs = LiveRuns(provider, settings.resolved_database_path.parent / "live-runs")
+    app.include_router(build_live_router(runs, settings.gemini_model))
     return app
 
 

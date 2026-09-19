@@ -37,4 +37,8 @@ class Settings(BaseSettings):
 
     @property
     def live_integrations(self) -> bool:
-        return self.identity_mode != "mock" or self.memory_mode != "cache"
+        return (
+            self.identity_mode != "mock"
+            or self.memory_mode != "cache"
+            or (self.agent_provider == "gemini" and bool(self.gemini_api_key))
+        )

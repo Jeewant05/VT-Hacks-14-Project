@@ -294,6 +294,146 @@
           }
         }
       }
+    },
+    "/live/config": {
+      "get": {
+        "tags": [
+          "live-agents"
+        ],
+        "summary": "Config",
+        "operationId": "config_live_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/live/runs": {
+      "post": {
+        "tags": [
+          "live-agents"
+        ],
+        "summary": "Start",
+        "operationId": "start_live_runs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LiveStartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveRunResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/live/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "live-agents"
+        ],
+        "summary": "Snapshot",
+        "operationId": "snapshot_live_runs__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/live/runs/{run_id}/events": {
+      "get": {
+        "tags": [
+          "live-agents"
+        ],
+        "summary": "Events",
+        "operationId": "events_live_runs__run_id__events_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -651,6 +791,39 @@
           "memory_mode"
         ],
         "title": "Health"
+      },
+      "LiveRunResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "status"
+        ],
+        "title": "LiveRunResponse"
+      },
+      "LiveStartRequest": {
+        "properties": {
+          "objective": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Objective"
+          }
+        },
+        "type": "object",
+        "required": [
+          "objective"
+        ],
+        "title": "LiveStartRequest"
       },
       "Objective": {
         "properties": {

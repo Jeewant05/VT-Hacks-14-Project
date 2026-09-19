@@ -35,12 +35,21 @@ class GeminiProvider:
         )
         payload: dict[str, Any] = {
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.2},
+            "generationConfig": {
+                "temperature": 0.2,
+                "responseMimeType": "application/json",
+            },
         }
         async with httpx.AsyncClient(timeout=90) as client:
-            response = await client.post(url, params={"key": self.settings.gemini_api_key}, json=payload)
+            response = await client.post(
+                url,
+                headers={"x-goog-api-key": self.settings.gemini_api_key},
+                json=payload,
+            )
         if response.is_error:
-            raise GeminiError(f"Gemini request failed ({response.status_code}): {response.text[:500]}")
+            raise GeminiError(
+                f"Gemini request failed ({response.status_code}): {response.text[:500]}"
+            )
         data = response.json()
         try:
             return "".join(part["text"] for part in data["candidates"][0]["content"]["parts"])
