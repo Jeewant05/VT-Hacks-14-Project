@@ -1,4 +1,5 @@
 import asyncio
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
@@ -8,6 +9,7 @@ from server.app.config import Settings
 from server.app.main import create_app
 from server.app.models import AgentPrincipal
 from server.app.store import write_state
+from server.app.tracing import DatabricksTraceSink
 
 
 def test_health_and_seeded_state(tmp_path):
@@ -49,3 +51,20 @@ def test_unknown_agent_is_not_mock_verified():
     )
     assert not result.verified
     assert result.source == "mock"
+
+
+def test_databricks_trace_reader_keeps_events_with_legacy_malformed_payloads():
+    sink = object.__new__(DatabricksTraceSink)
+    sink._table_name = "catalog.schema.traces"
+
+    async def execute(_statement):
+        return SimpleNamespace(result=SimpleNamespace(data_array=[[
+            "trace-1", "live_agent", "run_failed", "2026-09-19 21:57:27",
+            "run-1", None, None, "coordinator", '{"message":"line one\nline two"}',
+        ]]))
+
+    sink._execute = execute
+    events = asyncio.run(sink.recent())
+
+    assert events[0].payload["payload_parse_error"] is True
+    assert "line one" in events[0].payload["raw_payload"]

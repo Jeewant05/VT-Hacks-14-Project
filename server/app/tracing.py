@@ -95,7 +95,16 @@ class DatabricksTraceSink:
         rows = getattr(result, "data_array", None) or []
         events: list[TraceEvent] = []
         for row in rows:
-            payload = json.loads(row[8]) if row[8] else {}
+            payload = {}
+            if row[8]:
+                try:
+                    payload = json.loads(row[8])
+                except (TypeError, json.JSONDecodeError):
+                    # Older externally-written rows can contain raw newlines or
+                    # other non-JSON text. Keep the timeline readable instead of
+                    # making the entire trace endpoint unavailable.
+                    log.warning("Skipping malformed Databricks trace payload for %s", row[0])
+                    payload = {"raw_payload": str(row[8]), "payload_parse_error": True}
             events.append(TraceEvent(
                 trace_id=row[0], source=row[1], event_type=row[2], timestamp=row[3],
                 run_id=row[4], objective_id=row[5], workstream_id=row[6], agent_id=row[7], payload=payload,
