@@ -99,16 +99,35 @@ def _fingerprints(value: Any) -> frozenset[str]:
 
 
 def parse_badge(payload: dict[str, Any], url: str) -> Badge:
+    # Path order matters: the live GoDaddy log nests everything under the sealed
+    # producer event, with certificates under `attestations`. Those paths are
+    # pinned against a real badge in server/tests/fixtures/, and the flatter
+    # candidates are kept for the reference implementation's shape.
     event = "payload.producer.event"
+    attest = f"{event}.attestations"
     return Badge(
-        ans_name=_first(payload, "ansName", f"{event}.ansName", "agent.ansName") or "",
-        host=_first(payload, "agent.host", f"{event}.agent.host", "host") or "",
+        ans_name=_first(payload, f"{event}.ansName", "ansName", "agent.ansName") or "",
+        host=_first(payload, f"{event}.agent.host", "agent.host", "host") or "",
         status=str(_first(payload, "status", "agentStatus", f"{event}.status") or "").upper(),
         identity_cert_fingerprints=_fingerprints(
-            _first(payload, "identityCerts", "validIdentityCerts", f"{event}.identityCerts")
+            _first(
+                payload,
+                f"{attest}.validIdentityCerts",
+                f"{attest}.identityCert",
+                "identityCerts",
+                "validIdentityCerts",
+                f"{event}.identityCerts",
+            )
         ),
         server_cert_fingerprints=_fingerprints(
-            _first(payload, "serverCerts", "validServerCerts", f"{event}.serverCerts")
+            _first(
+                payload,
+                f"{attest}.validServerCerts",
+                f"{attest}.serverCert",
+                "serverCerts",
+                "validServerCerts",
+                f"{event}.serverCerts",
+            )
         ),
         url=url,
         raw=payload,

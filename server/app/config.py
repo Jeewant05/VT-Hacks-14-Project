@@ -76,6 +76,10 @@ class Settings(BaseSettings):
     # ANS HTTP-01 domain validation: {"<token>": "<keyAuthorization>"} as JSON.
     acme_challenges: str | None = None
 
+    # Porkbun DNS API, for publishing the ANS discovery records.
+    porkbun_api_key: str | None = None
+    porkbun_secret_key: str | None = None
+
     databricks_host: str = ""
     databricks_token: str = ""
     databricks_warehouse_id: str = ""
