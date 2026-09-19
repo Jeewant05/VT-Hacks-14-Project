@@ -6,6 +6,8 @@ from server.app.config import Settings
 from server.app.live_agents import LiveRuns
 from server.app.live_routes import build_live_router
 from server.app.models import Health, WorkspaceState
+from server.app.orchestration import OrchestrationKernel
+from server.app.orchestration_routes import build_orchestration_router
 from server.app.providers import build_agent_providers
 from server.app.routes import build_router
 from server.app.service import Coordinator
@@ -47,8 +49,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     trace = build_trace_sink(settings)
+    identity = build_identity(settings)
     coordinator = Coordinator(
-        settings.resolved_database_path, build_identity(settings), build_memory(settings), trace
+        settings.resolved_database_path, identity, build_memory(settings), trace
     )
 
     @app.get("/health", response_model=Health)
@@ -66,6 +69,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(build_router(coordinator, _fresh_state))
     app.include_router(build_trace_router(trace))
+    app.include_router(build_orchestration_router(
+        OrchestrationKernel(settings.resolved_database_path, identity, trace)
+    ))
     configured = build_agent_providers(settings)
     providers = {
         role: configured[source]

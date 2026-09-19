@@ -160,6 +160,176 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/objectives": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Objective */
+        post: operations["create_objective_api_objectives_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/objectives/{objective_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Status */
+        get: operations["status_api_objectives__objective_id__status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agents/{agent_id}/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Plan */
+        post: operations["plan_api_agents__agent_id__plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/intentions/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate Intention */
+        post: operations["validate_intention_api_intentions_validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conflicts/detect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Detect Conflicts */
+        post: operations["detect_conflicts_api_conflicts_detect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conflicts/{conflict_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve Conflict */
+        post: operations["resolve_conflict_api_conflicts__conflict_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conflicts/{conflict_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Conflict */
+        post: operations["approve_conflict_api_conflicts__conflict_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agents/{agent_id}/execute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Execute */
+        post: operations["execute_api_agents__agent_id__execute_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/changesets/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Changeset */
+        post: operations["submit_changeset_api_changesets_submit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/objectives/{objective_id}/converge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Converge */
+        post: operations["converge_api_objectives__objective_id__converge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/live/config": {
         parameters: {
             query?: never;
@@ -335,6 +505,17 @@ export interface components {
             agent_id: string;
             contract: components["schemas"]["ApiContract"];
         };
+        /** DemoAgent */
+        DemoAgent: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Role */
+            role: string;
+            /** Allowed Paths */
+            allowed_paths: string[];
+        };
         /** Event */
         Event: {
             /** Event Id */
@@ -382,6 +563,50 @@ export interface components {
              */
             live_integrations: boolean;
         };
+        /** IntentionContract */
+        IntentionContract: {
+            /** Name */
+            name: string;
+            /** Request Fields */
+            request_fields?: string[];
+            /** Response Fields */
+            response_fields?: string[];
+        };
+        /** IntentionDocument */
+        IntentionDocument: {
+            /** Agent Id */
+            agent_id: string;
+            /** Objective Id */
+            objective_id: string;
+            /** Workstream Id */
+            workstream_id: string;
+            /** Summary */
+            summary: string;
+            /** Planned Files */
+            planned_files?: string[];
+            /** Planned Symbols */
+            planned_symbols?: string[];
+            /** Contracts Provided */
+            contracts_provided?: components["schemas"]["IntentionContract"][];
+            /** Contracts Consumed */
+            contracts_consumed?: components["schemas"]["IntentionContract"][];
+            /** Database Changes */
+            database_changes?: string[];
+            /** Dependencies */
+            dependencies?: string[];
+            /** Assumptions */
+            assumptions?: string[];
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "low" | "medium" | "high";
+            /**
+             * Version
+             * @default 1
+             */
+            version: number;
+        };
         /** LiveRunResponse */
         LiveRunResponse: {
             /** Run Id */
@@ -411,6 +636,167 @@ export interface components {
              */
             status: "active" | "complete";
         };
+        /** ObjectiveRequest */
+        ObjectiveRequest: {
+            /**
+             * Id
+             * @default objective-oauth
+             */
+            id: string;
+            /**
+             * Title
+             * @default Add organization-level OAuth login
+             */
+            title: string;
+            /**
+             * Description
+             * @default Coordinate three agents before overlapping changes are written.
+             */
+            description: string;
+            /** Acceptance Criteria */
+            acceptance_criteria?: string[];
+        };
+        /** OrchestrationChangeSet */
+        OrchestrationChangeSet: {
+            /** Workstream Id */
+            workstream_id: string;
+            /** Agent Id */
+            agent_id: string;
+            /** Intention Version */
+            intention_version: number;
+            /** Branch */
+            branch: string;
+            /** Commit Sha */
+            commit_sha?: string | null;
+            /** Changed Files */
+            changed_files: string[];
+            /** Changed Symbols */
+            changed_symbols?: string[];
+            /** Contracts Provided */
+            contracts_provided?: components["schemas"]["IntentionContract"][];
+            /** Contracts Consumed */
+            contracts_consumed?: components["schemas"]["IntentionContract"][];
+            /** Database Changes */
+            database_changes?: string[];
+            tests: components["schemas"]["TestSummary"];
+        };
+        /** OrchestrationConflict */
+        OrchestrationConflict: {
+            /** Conflict Id */
+            conflict_id: string;
+            /** Objective Id */
+            objective_id: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "FILE_CONFLICT" | "SYMBOL_CONFLICT" | "CONTRACT_CONFLICT" | "DEPENDENCY_CONFLICT" | "PERMISSION_CONFLICT" | "INTENT_DRIFT";
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "LOW" | "MEDIUM" | "HIGH";
+            /** Workstream Ids */
+            workstream_ids: string[];
+            /** Evidence */
+            evidence?: {
+                [key: string]: unknown;
+            };
+            /** Related Decision Id */
+            related_decision_id?: string | null;
+            /**
+             * Status
+             * @default OPEN
+             * @enum {string}
+             */
+            status: "OPEN" | "RESOLUTION_PROPOSED" | "AWAITING_APPROVAL" | "RESOLVED" | "REJECTED";
+            /** Recommended Action */
+            recommended_action?: string | null;
+            /** Approved By */
+            approved_by?: string | null;
+            /** Resolution */
+            resolution?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** OrchestrationEvent */
+        OrchestrationEvent: {
+            /** Event Id */
+            event_id: string;
+            /** Event Type */
+            event_type: string;
+            /** Timestamp */
+            timestamp: string;
+            /** Agent Id */
+            agent_id?: string | null;
+            /** Workstream Id */
+            workstream_id?: string | null;
+            /** Payload */
+            payload?: {
+                [key: string]: unknown;
+            };
+        };
+        /** OrchestrationState */
+        OrchestrationState: {
+            objective?: components["schemas"]["Objective"] | null;
+            /** Agents */
+            agents?: components["schemas"]["DemoAgent"][];
+            /** Workstreams */
+            workstreams?: components["schemas"]["OrchestrationWorkstream"][];
+            /** Conflicts */
+            conflicts?: components["schemas"]["OrchestrationConflict"][];
+            /** Events */
+            events?: components["schemas"]["OrchestrationEvent"][];
+        };
+        /** OrchestrationWorkstream */
+        OrchestrationWorkstream: {
+            /** Id */
+            id: string;
+            /** Agent Id */
+            agent_id: string;
+            /** Title */
+            title: string;
+            /** Allowed Paths */
+            allowed_paths: string[];
+            /**
+             * State
+             * @default PENDING
+             * @enum {string}
+             */
+            state: "PENDING" | "PLANNING" | "INTENT_SUBMITTED" | "VALIDATING" | "BLOCKED" | "APPROVED" | "EXECUTING" | "CHANGESET_SUBMITTED" | "CONVERGING" | "COMPLETE" | "FAILED";
+            intention?: components["schemas"]["IntentionDocument"] | null;
+            changeset?: components["schemas"]["OrchestrationChangeSet"] | null;
+            /** Block Reason */
+            block_reason?: string | null;
+        };
+        /** ResolutionApproval */
+        ResolutionApproval: {
+            /** Approved By */
+            approved_by: string;
+        };
+        /** ResolutionProposal */
+        ResolutionProposal: {
+            /**
+             * Recommended Action
+             * @enum {string}
+             */
+            recommended_action: "UPDATE_CONTRACT" | "REASSIGN_FILE_OWNER" | "ADD_DEPENDENCY" | "SERIALIZE_WORKSTREAMS" | "SPLIT_SHARED_WORK" | "REQUEST_SCOPE_EXPANSION" | "REQUEST_HUMAN_REVIEW";
+            /** Affected Workstreams */
+            affected_workstreams: string[];
+            /** Reasoning */
+            reasoning: string;
+            /** Proposed Changes */
+            proposed_changes?: {
+                [key: string]: unknown;
+            };
+            /** Confidence */
+            confidence: number;
+            /**
+             * Requires Human Approval
+             * @default false
+             */
+            requires_human_approval: boolean;
+        };
         /** ScopeRequest */
         ScopeRequest: {
             /** Agent Id */
@@ -433,6 +819,13 @@ export interface components {
              * @enum {string}
              */
             source: "agent_reported" | "synapse_executed";
+        };
+        /** TestSummary */
+        TestSummary: {
+            /** Passed */
+            passed: number;
+            /** Failed */
+            failed: number;
         };
         /**
          * TraceEvent
@@ -778,6 +1171,330 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TraceEvent"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_objective_api_objectives_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ObjectiveRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrchestrationState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    status_api_objectives__objective_id__status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                objective_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrchestrationState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_api_agents__agent_id__plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["IntentionDocument"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrchestrationState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_intention_api_intentions_validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntentionDocument"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrchestrationState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detect_conflicts_api_conflicts_detect_post: {
+        parameters: {
+            query: {
+                objective_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrchestrationState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_conflict_api_conflicts__conflict_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conflict_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolutionProposal"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_conflict_api_conflicts__conflict_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conflict_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolutionApproval"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrchestrationState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    execute_api_agents__agent_id__execute_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrchestrationState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_changeset_api_changesets_submit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrchestrationChangeSet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrchestrationState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    converge_api_objectives__objective_id__converge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                objective_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrchestrationState"];
                 };
             };
             /** @description Validation Error */

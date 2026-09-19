@@ -229,6 +229,37 @@
       "title": "Decision",
       "type": "object"
     },
+    "DemoAgent": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "allowed_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Paths",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "role",
+        "allowed_paths"
+      ],
+      "title": "DemoAgent",
+      "type": "object"
+    },
     "Event": {
       "properties": {
         "event_id": {
@@ -286,6 +317,125 @@
       "title": "Event",
       "type": "object"
     },
+    "IntentionContract": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "request_fields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Request Fields",
+          "type": "array"
+        },
+        "response_fields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Response Fields",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "IntentionContract",
+      "type": "object"
+    },
+    "IntentionDocument": {
+      "properties": {
+        "agent_id": {
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "objective_id": {
+          "title": "Objective Id",
+          "type": "string"
+        },
+        "workstream_id": {
+          "title": "Workstream Id",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "planned_files": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Planned Files",
+          "type": "array"
+        },
+        "planned_symbols": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Planned Symbols",
+          "type": "array"
+        },
+        "contracts_provided": {
+          "items": {
+            "$ref": "#/$defs/IntentionContract"
+          },
+          "title": "Contracts Provided",
+          "type": "array"
+        },
+        "contracts_consumed": {
+          "items": {
+            "$ref": "#/$defs/IntentionContract"
+          },
+          "title": "Contracts Consumed",
+          "type": "array"
+        },
+        "database_changes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Database Changes",
+          "type": "array"
+        },
+        "dependencies": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "assumptions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Assumptions",
+          "type": "array"
+        },
+        "risk_level": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "Risk Level",
+          "type": "string"
+        },
+        "version": {
+          "default": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agent_id",
+        "objective_id",
+        "workstream_id",
+        "summary",
+        "risk_level"
+      ],
+      "title": "IntentionDocument",
+      "type": "object"
+    },
     "Objective": {
       "properties": {
         "id": {
@@ -326,6 +476,381 @@
       "title": "Objective",
       "type": "object"
     },
+    "OrchestrationChangeSet": {
+      "properties": {
+        "workstream_id": {
+          "title": "Workstream Id",
+          "type": "string"
+        },
+        "agent_id": {
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "intention_version": {
+          "title": "Intention Version",
+          "type": "integer"
+        },
+        "branch": {
+          "title": "Branch",
+          "type": "string"
+        },
+        "commit_sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Commit Sha"
+        },
+        "changed_files": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Changed Files",
+          "type": "array"
+        },
+        "changed_symbols": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Changed Symbols",
+          "type": "array"
+        },
+        "contracts_provided": {
+          "items": {
+            "$ref": "#/$defs/IntentionContract"
+          },
+          "title": "Contracts Provided",
+          "type": "array"
+        },
+        "contracts_consumed": {
+          "items": {
+            "$ref": "#/$defs/IntentionContract"
+          },
+          "title": "Contracts Consumed",
+          "type": "array"
+        },
+        "database_changes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Database Changes",
+          "type": "array"
+        },
+        "tests": {
+          "$ref": "#/$defs/TestSummary"
+        }
+      },
+      "required": [
+        "workstream_id",
+        "agent_id",
+        "intention_version",
+        "branch",
+        "changed_files",
+        "tests"
+      ],
+      "title": "OrchestrationChangeSet",
+      "type": "object"
+    },
+    "OrchestrationConflict": {
+      "properties": {
+        "conflict_id": {
+          "title": "Conflict Id",
+          "type": "string"
+        },
+        "objective_id": {
+          "title": "Objective Id",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "FILE_CONFLICT",
+            "SYMBOL_CONFLICT",
+            "CONTRACT_CONFLICT",
+            "DEPENDENCY_CONFLICT",
+            "PERMISSION_CONFLICT",
+            "INTENT_DRIFT"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "workstream_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Workstream Ids",
+          "type": "array"
+        },
+        "evidence": {
+          "additionalProperties": true,
+          "title": "Evidence",
+          "type": "object"
+        },
+        "related_decision_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Related Decision Id"
+        },
+        "status": {
+          "default": "OPEN",
+          "enum": [
+            "OPEN",
+            "RESOLUTION_PROPOSED",
+            "AWAITING_APPROVAL",
+            "RESOLVED",
+            "REJECTED"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "recommended_action": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recommended Action"
+        },
+        "approved_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approved By"
+        },
+        "resolution": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolution"
+        }
+      },
+      "required": [
+        "conflict_id",
+        "objective_id",
+        "type",
+        "severity",
+        "workstream_ids"
+      ],
+      "title": "OrchestrationConflict",
+      "type": "object"
+    },
+    "OrchestrationEvent": {
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "event_type": {
+          "title": "Event Type",
+          "type": "string"
+        },
+        "timestamp": {
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "agent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent Id"
+        },
+        "workstream_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workstream Id"
+        },
+        "payload": {
+          "additionalProperties": true,
+          "title": "Payload",
+          "type": "object"
+        }
+      },
+      "required": [
+        "event_id",
+        "event_type",
+        "timestamp"
+      ],
+      "title": "OrchestrationEvent",
+      "type": "object"
+    },
+    "OrchestrationState": {
+      "properties": {
+        "objective": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Objective"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "agents": {
+          "items": {
+            "$ref": "#/$defs/DemoAgent"
+          },
+          "title": "Agents",
+          "type": "array"
+        },
+        "workstreams": {
+          "items": {
+            "$ref": "#/$defs/OrchestrationWorkstream"
+          },
+          "title": "Workstreams",
+          "type": "array"
+        },
+        "conflicts": {
+          "items": {
+            "$ref": "#/$defs/OrchestrationConflict"
+          },
+          "title": "Conflicts",
+          "type": "array"
+        },
+        "events": {
+          "items": {
+            "$ref": "#/$defs/OrchestrationEvent"
+          },
+          "title": "Events",
+          "type": "array"
+        }
+      },
+      "title": "OrchestrationState",
+      "type": "object"
+    },
+    "OrchestrationWorkstream": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "agent_id": {
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "allowed_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Paths",
+          "type": "array"
+        },
+        "state": {
+          "default": "PENDING",
+          "enum": [
+            "PENDING",
+            "PLANNING",
+            "INTENT_SUBMITTED",
+            "VALIDATING",
+            "BLOCKED",
+            "APPROVED",
+            "EXECUTING",
+            "CHANGESET_SUBMITTED",
+            "CONVERGING",
+            "COMPLETE",
+            "FAILED"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "intention": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IntentionDocument"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "changeset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OrchestrationChangeSet"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "block_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Block Reason"
+        }
+      },
+      "required": [
+        "id",
+        "agent_id",
+        "title",
+        "allowed_paths"
+      ],
+      "title": "OrchestrationWorkstream",
+      "type": "object"
+    },
     "TestResult": {
       "properties": {
         "name": {
@@ -356,6 +881,26 @@
         "status"
       ],
       "title": "TestResult",
+      "type": "object"
+    },
+    "TestSummary": {
+      "properties": {
+        "passed": {
+          "minimum": 0,
+          "title": "Passed",
+          "type": "integer"
+        },
+        "failed": {
+          "minimum": 0,
+          "title": "Failed",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "passed",
+        "failed"
+      ],
+      "title": "TestSummary",
       "type": "object"
     },
     "VerificationResult": {
@@ -558,6 +1103,9 @@
   "anyOf": [
     {
       "$ref": "#/$defs/WorkspaceState"
+    },
+    {
+      "$ref": "#/$defs/OrchestrationState"
     },
     {
       "$ref": "#/$defs/VerificationResult"
