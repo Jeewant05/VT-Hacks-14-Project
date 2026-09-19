@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/health": {
+    "/api/health": {
         parameters: {
             query?: never;
             header?: never;
@@ -12,7 +12,7 @@ export interface paths {
             cookie?: never;
         };
         /** Health */
-        get: operations["health_health_get"];
+        get: operations["health_api_health_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -21,7 +21,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/state": {
+    "/api/state": {
         parameters: {
             query?: never;
             header?: never;
@@ -29,7 +29,7 @@ export interface paths {
             cookie?: never;
         };
         /** State */
-        get: operations["state_state_get"];
+        get: operations["state_api_state_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -38,7 +38,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/agents/{agent_id}/join": {
+    "/api/agents/{agent_id}/join": {
         parameters: {
             query?: never;
             header?: never;
@@ -48,14 +48,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Join */
-        post: operations["join_agents__agent_id__join_post"];
+        post: operations["join_api_agents__agent_id__join_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/workstreams/{ws_id}/claim": {
+    "/api/workstreams/{ws_id}/claim": {
         parameters: {
             query?: never;
             header?: never;
@@ -65,14 +65,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Claim */
-        post: operations["claim_workstreams__ws_id__claim_post"];
+        post: operations["claim_api_workstreams__ws_id__claim_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/workstreams/{ws_id}/declare": {
+    "/api/workstreams/{ws_id}/declare": {
         parameters: {
             query?: never;
             header?: never;
@@ -82,14 +82,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Declare */
-        post: operations["declare_workstreams__ws_id__declare_post"];
+        post: operations["declare_api_workstreams__ws_id__declare_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/workstreams/{ws_id}/scope": {
+    "/api/workstreams/{ws_id}/scope": {
         parameters: {
             query?: never;
             header?: never;
@@ -99,14 +99,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Reassign Scope */
-        post: operations["reassign_scope_workstreams__ws_id__scope_post"];
+        post: operations["reassign_scope_api_workstreams__ws_id__scope_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/workstreams/{ws_id}/submit": {
+    "/api/workstreams/{ws_id}/submit": {
         parameters: {
             query?: never;
             header?: never;
@@ -116,14 +116,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Submit */
-        post: operations["submit_workstreams__ws_id__submit_post"];
+        post: operations["submit_api_workstreams__ws_id__submit_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/reset": {
+    "/api/reset": {
         parameters: {
             query?: never;
             header?: never;
@@ -134,9 +134,12 @@ export interface paths {
         put?: never;
         /**
          * Reset
-         * @description Local demo only. Restores the seeded fixture.
+         * @description Replace the workspace with the seeded fixture.
+         *
+         *     Destructive, so it is behind the shared demo secret: on a public
+         *     deployment an open reset lets anyone wipe the demo mid-presentation.
          */
-        post: operations["reset_reset_post"];
+        post: operations["reset_api_reset_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -398,6 +401,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/demo/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run */
+        post: operations["run_api_demo_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/.well-known/agent-card.json": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Agent Card */
+        get: operations["agent_card__well_known_agent_card_json_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -523,6 +560,15 @@ export interface components {
             allowed_paths: string[];
             /** Ans Name */
             ans_name?: string | null;
+        };
+        /** DemoRunResponse */
+        DemoRunResponse: {
+            /** Status */
+            status: string;
+            /** Agents */
+            agents: string[];
+            /** Detail */
+            detail?: string | null;
         };
         /** Event */
         Event: {
@@ -940,7 +986,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    health_health_get: {
+    health_api_health_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -960,7 +1006,7 @@ export interface operations {
             };
         };
     };
-    state_state_get: {
+    state_api_state_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -980,7 +1026,7 @@ export interface operations {
             };
         };
     };
-    join_agents__agent_id__join_post: {
+    join_api_agents__agent_id__join_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1011,7 +1057,7 @@ export interface operations {
             };
         };
     };
-    claim_workstreams__ws_id__claim_post: {
+    claim_api_workstreams__ws_id__claim_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1046,7 +1092,7 @@ export interface operations {
             };
         };
     };
-    declare_workstreams__ws_id__declare_post: {
+    declare_api_workstreams__ws_id__declare_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1081,7 +1127,7 @@ export interface operations {
             };
         };
     };
-    reassign_scope_workstreams__ws_id__scope_post: {
+    reassign_scope_api_workstreams__ws_id__scope_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1116,7 +1162,7 @@ export interface operations {
             };
         };
     };
-    submit_workstreams__ws_id__submit_post: {
+    submit_api_workstreams__ws_id__submit_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1151,10 +1197,12 @@ export interface operations {
             };
         };
     };
-    reset_reset_post: {
+    reset_api_reset_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "x-demo-token"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1167,6 +1215,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkspaceState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1530,7 +1587,9 @@ export interface operations {
     config_live_config_get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "x-demo-token"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1545,12 +1604,23 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     start_live_runs_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "x-demo-token"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1583,7 +1653,9 @@ export interface operations {
     snapshot_live_runs__run_id__get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "x-demo-token"?: string | null;
+            };
             path: {
                 run_id: string;
             };
@@ -1614,7 +1686,9 @@ export interface operations {
     events_live_runs__run_id__events_get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "x-demo-token"?: string | null;
+            };
             path: {
                 run_id: string;
             };
@@ -1638,6 +1712,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_api_demo_run_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-demo-token"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoRunResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    agent_card__well_known_agent_card_json_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

@@ -83,11 +83,25 @@ export function useCoordinator() {
 
   const setAction = (action: PendingAction) => { pendingRef.current = action; setPending(action); };
 
-  const request = useCallback(async <T,>(path: string, init?: RequestInit): Promise<T> => {
-    const response = await fetch(`/api${path}`, {
-      ...init,
-      headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
-    });
+  // Operator secret for destructive endpoints. Held for the tab only, never
+  // persisted: it authorizes resets and demo runs, not a user session.
+  const demoToken = useCallback((): string | null => {
+    try {
+      const held = sessionStorage.getItem('synapse-demo-token');
+      if (held) return held;
+      const entered = window.prompt('Demo token (set as DEMO_TOKEN on the server)');
+      if (entered) sessionStorage.setItem('synapse-demo-token', entered);
+      return entered;
+    } catch {
+      return null; // Private mode or blocked storage: fall back to no token.
+    }
+  }, []);
+
+  const request = useCallback(async <T,>(path: string, init?: RequestInit, token?: string | null): Promise<T> => {
+    const headers: Record<string, string> = {};
+    if (init?.body) headers['Content-Type'] = 'application/json';
+    if (token) headers['X-Demo-Token'] = token;
+    const response = await fetch(`/api${path}`, { ...init, headers });
     return parseResponse<T>(response);
   }, []);
 
@@ -112,8 +126,8 @@ export function useCoordinator() {
     return () => clearInterval(timer);
   }, [refresh]);
 
-  const post = useCallback(async (path: string, body?: unknown) => {
-    const next = await request<WorkspaceState>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) });
+  const post = useCallback(async (path: string, body?: unknown, token?: string | null) => {
+    const next = await request<WorkspaceState>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) }, token);
     setWorkspace(next); setUpdatedAt(new Date());
     return next;
   }, [request]);
@@ -126,6 +140,16 @@ export function useCoordinator() {
   }, []);
 
   const start = useCallback(() => perform('start', async () => {
+    // In ANS mode every privileged call needs a proof signed by an agent's
+    // identity key, and a browser must never hold those. The server runs the
+    // scripted agents instead; the dashboard polls /state to follow along.
+    if (health?.dpop_required) {
+      const token = demoToken();
+      await request<{ status: string; detail?: string }>('/demo/run', { method: 'POST' }, token)
+        .then(result => { if (result.status !== 'complete') throw new Error(result.detail ?? 'Demo run failed.'); });
+      await refresh();
+      return;
+    }
     await post('/reset');
     await post('/agents/backend-agent/join');
     await post('/agents/frontend-agent/join');
@@ -136,7 +160,7 @@ export function useCoordinator() {
     await post('/workstreams/backend/declare', { agent_id: 'backend-agent', contract: contract('provides', approvedFields) });
     await post('/workstreams/frontend/declare', { agent_id: 'frontend-agent', contract: contract('consumes', approvedFields) });
     await post('/workstreams/telemetry/declare', { agent_id: 'telemetry-agent', contract: contract('consumes', approvedFields) });
-  }), [perform, post]);
+  }), [perform, post, health, demoToken, request, refresh]);
 
   const applyPlan = useCallback(() => perform('coordinate', async () => {
     await post('/workstreams/backend/scope', { agent_id: 'backend-agent', owned_paths: ['src/api/auth/oauth.ts', 'src/auth/session.ts', 'src/api/auth/oauth.test.ts'] });
@@ -176,7 +200,7 @@ export function useCoordinator() {
     await post('/workstreams/telemetry/submit', telemetry);
   }), [perform, post]);
 
-  const reset = useCallback(() => perform('reset', async () => { await post('/reset'); }), [perform, post]);
+  const reset = useCallback(() => perform('reset', async () => { await post('/reset', undefined, health?.dpop_required ? demoToken() : null); }), [perform, post, health, demoToken]);
   const demo = useMemo(() => workspaceToDemo(workspace, pending), [workspace, pending]);
 
   return {

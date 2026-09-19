@@ -1,8 +1,13 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from server.app.adapters import CacheMemory, IdentityAdapter, MemoryAdapter, MockIdentity
 from server.app.config import Settings
+from server.app.demo_runner import (
+    build_demo_guard,
+    build_demo_router,
+    require_demo_token_for_public,
+)
 from server.app.live_agents import LiveRuns
 from server.app.live_routes import build_live_router
 from server.app.models import Health, WorkspaceState
@@ -14,6 +19,7 @@ from server.app.service import Coordinator
 from server.app.store import read_state
 from server.app.trace_routes import build_trace_router
 from server.app.tracing import build_trace_sink
+from server.app.web import build_web_router, mount_ui
 
 
 def _fresh_state_for(settings: Settings):
@@ -48,6 +54,7 @@ def build_memory(settings: Settings) -> MemoryAdapter:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
+    require_demo_token_for_public(settings)
     app = FastAPI(title="Synapse API", version="0.6.0")
     app.add_middleware(
         CORSMiddleware,
@@ -63,7 +70,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         settings.resolved_database_path, identity, build_memory(settings), trace
     )
 
-    @app.get("/health", response_model=Health)
+    @app.get("/api/health", response_model=Health)
     def health() -> Health:
         return Health(
             identity_mode=settings.identity_mode,
@@ -74,7 +81,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             dpop_required=bool(ans_identity and settings.ans_dpop_required),
         )
 
-    @app.get("/state", response_model=WorkspaceState)
+    @app.get("/api/state", response_model=WorkspaceState)
     def state() -> WorkspaceState:
         return read_state(settings.resolved_database_path)
 
@@ -84,6 +91,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             _fresh_state_for(settings),
             ans_identity=ans_identity,
             dpop_required=settings.ans_dpop_required,
+            demo_token=settings.demo_token,
         )
     )
     app.include_router(build_trace_router(trace))
@@ -105,7 +113,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if source in configured
     }
     runs = LiveRuns(providers, settings.resolved_database_path.parent / "live-runs", trace)
-    app.include_router(build_live_router(runs, settings.gemini_model))
+    # Live agents spend real provider credit, so the routes sit behind the shared
+    # demo secret. They stay mounted either way; /live/config reports what is
+    # configured, which the dashboard needs before any run is possible.
+    app.include_router(
+        build_live_router(runs, settings.gemini_model),
+        dependencies=[Depends(build_demo_guard(settings.demo_token))],
+    )
+
+    app.include_router(
+        build_demo_router(settings, settings.demo_token, local_base=settings.local_base_url)
+    )
+    app.include_router(build_web_router(settings))
+    # Mounted last so every /api route still matches first.
+    mount_ui(app)
     return app
 
 

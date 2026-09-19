@@ -67,24 +67,24 @@ class AgentClient:
         return response.json()
 
     def join(self) -> dict[str, Any]:
-        return self._request("POST", f"/agents/{self.agent_id}/join")
+        return self._request("POST", f"/api/agents/{self.agent_id}/join")
 
     def claim(self, workstream_id: str) -> dict[str, Any]:
         return self._request(
-            "POST", f"/workstreams/{workstream_id}/claim", {"agent_id": self.agent_id}
+            "POST", f"/api/workstreams/{workstream_id}/claim", {"agent_id": self.agent_id}
         )
 
     def declare(self, workstream_id: str, contract: dict[str, Any]) -> dict[str, Any]:
         return self._request(
             "POST",
-            f"/workstreams/{workstream_id}/declare",
+            f"/api/workstreams/{workstream_id}/declare",
             {"agent_id": self.agent_id, "contract": contract},
         )
 
     def scope(self, workstream_id: str, owned_paths: list[str]) -> dict[str, Any]:
         return self._request(
             "POST",
-            f"/workstreams/{workstream_id}/scope",
+            f"/api/workstreams/{workstream_id}/scope",
             {"agent_id": self.agent_id, "owned_paths": owned_paths},
         )
 
@@ -97,7 +97,7 @@ class AgentClient:
     ) -> dict[str, Any]:
         return self._request(
             "POST",
-            f"/workstreams/{workstream_id}/submit",
+            f"/api/workstreams/{workstream_id}/submit",
             {
                 "id": f"test-{workstream_id}",
                 "workstream_id": workstream_id,

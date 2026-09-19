@@ -17,10 +17,10 @@ def test_health_and_seeded_state(tmp_path):
         database_path=path, trace_mode="cache", backend_provider="none",
         frontend_provider="none", qa_provider="none",
     )))
-    health = client.get("/health").json()
+    health = client.get("/api/health").json()
     assert health["live_integrations"] is False
     assert health["trace_mode"] == "cache"
-    state = client.get("/state").json()
+    state = client.get("/api/state").json()
     assert len(state["workstreams"]) == 3
     assert not any(agent["verified"] for agent in state["agents"])
     assert state["workstreams"][0]["contract"] != state["workstreams"][1]["contract"]
@@ -34,7 +34,7 @@ def test_coordinator_events_are_available_from_trace_api(tmp_path):
         frontend_provider="none", qa_provider="none",
     )))
 
-    assert client.post("/agents/backend-agent/join").status_code == 200
+    assert client.post("/api/agents/backend-agent/join").status_code == 200
     traces = client.get("/traces").json()
 
     assert len(traces) == 1

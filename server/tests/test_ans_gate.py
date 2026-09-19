@@ -103,14 +103,14 @@ def signed_post(client, signer, path, payload=None):
 
 def test_unsigned_call_cannot_join(tmp_path):
     client, _, _ = build(tmp_path)
-    response = client.post("/agents/backend-agent/join")
+    response = client.post("/api/agents/backend-agent/join")
     assert response.status_code == 401
     assert "DPoP" in response.json()["detail"]
 
 
 def test_signed_call_joins_and_records_ans_evidence(tmp_path):
     client, signers, path = build(tmp_path)
-    response = signed_post(client, signers["backend-agent"], "/agents/backend-agent/join")
+    response = signed_post(client, signers["backend-agent"], "/api/agents/backend-agent/join")
     assert response.status_code == 200, response.text
 
     state = read_state(path)
@@ -127,16 +127,16 @@ def test_signed_call_joins_and_records_ans_evidence(tmp_path):
 def test_registered_agent_cannot_act_as_another(tmp_path):
     """The impersonation row: a real ANS identity is still bound to one agent_id."""
     client, signers, _ = build(tmp_path)
-    joined = signed_post(client, signers["frontend-agent"], "/agents/frontend-agent/join")
+    joined = signed_post(client, signers["frontend-agent"], "/api/agents/frontend-agent/join")
     assert joined.status_code == 200, joined.text
 
     # frontend-agent's key, claiming to be backend-agent.
     body = json.dumps({"agent_id": "backend-agent"}, separators=(",", ":")).encode()
     response = client.post(
-        "/workstreams/backend/claim",
+        "/api/workstreams/backend/claim",
         content=body,
         headers={
-            "DPoP": signers["frontend-agent"].proof("POST", "/workstreams/backend/claim", body),
+            "DPoP": signers["frontend-agent"].proof("POST", "/api/workstreams/backend/claim", body),
             "Content-Type": "application/json",
         },
     )
@@ -146,20 +146,20 @@ def test_registered_agent_cannot_act_as_another(tmp_path):
 
 def test_replayed_request_is_refused_by_the_gate(tmp_path):
     client, signers, _ = build(tmp_path)
-    proof = signers["backend-agent"].proof("POST", "/agents/backend-agent/join", b"")
-    first = client.post("/agents/backend-agent/join", headers={"DPoP": proof})
+    proof = signers["backend-agent"].proof("POST", "/api/agents/backend-agent/join", b"")
+    first = client.post("/api/agents/backend-agent/join", headers={"DPoP": proof})
     assert first.status_code == 200
-    replay = client.post("/agents/backend-agent/join", headers={"DPoP": proof})
+    replay = client.post("/api/agents/backend-agent/join", headers={"DPoP": proof})
     assert replay.status_code == 401
     assert "already been used" in replay.json()["detail"]
 
 
 def test_duplicate_dpop_headers_are_refused(tmp_path):
     client, signers, _ = build(tmp_path)
-    proof = signers["backend-agent"].proof("POST", "/agents/backend-agent/join", b"")
+    proof = signers["backend-agent"].proof("POST", "/api/agents/backend-agent/join", b"")
     # httpx sends a repeated header when given a list of tuples.
     response = client.post(
-        "/agents/backend-agent/join", headers=[("DPoP", proof), ("DPoP", proof)]
+        "/api/agents/backend-agent/join", headers=[("DPoP", proof), ("DPoP", proof)]
     )
     assert response.status_code == 401
     assert "multiple DPoP headers" in response.json()["detail"]
@@ -178,7 +178,7 @@ def test_unverified_agent_cannot_declare(tmp_path):
         },
     }
     response = signed_post(
-        client, signers["backend-agent"], "/workstreams/backend/declare", payload
+        client, signers["backend-agent"], "/api/workstreams/backend/declare", payload
     )
     assert response.status_code == 403
     assert "not a verified agent" in response.json()["detail"]

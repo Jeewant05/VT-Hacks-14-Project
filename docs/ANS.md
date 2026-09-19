@@ -210,3 +210,42 @@ ans-cli revoke <telemetryAgentId> --reason CESSATION_OF_OPERATION
 ```
 
 Badges are cached for `ANS_BADGE_TTL_SECONDS` (default 60), so allow a minute.
+
+## Deployment
+
+The API lives under `/api` in every environment and FastAPI serves the built
+dashboard at `/` (`server/app/web.py`). The dev proxy no longer rewrites the
+prefix, so a DPoP proof signed in development binds the same path it will bind in
+production — `htu` is exact, and a mismatch is a rejection.
+
+`Dockerfile` and `fly.toml` deploy one container answering on the apex and the
+three agent subdomains. `/.well-known/agent-card.json` is routed by `Host`, so
+each registered agent serves its own card rather than the coordinator's.
+
+### The dashboard in ANS mode
+
+A browser must never hold an agent identity key, so `POST /api/demo/run`
+(`server/app/demo_runner.py`) runs the three scripted agents server-side. The
+proofs are real: each agent signs against `ANS_PUBLIC_BASE_URL` while the request
+travels over loopback, which verifies because an ANS-6 verifier compares `htu`
+against configured authority and never reads the `Host` header.
+
+The dashboard asks for `DEMO_TOKEN` once per tab and keeps it in
+`sessionStorage`. It is an operator secret, not a user session.
+
+### Fail closed by construction
+
+`require_demo_token_for_public()` refuses to build the app when
+`ANS_PUBLIC_BASE_URL` is a public host and `DEMO_TOKEN` is unset — `/api/reset`,
+`/api/demo/run` and the live-agent routes would otherwise be open to anyone who
+finds the URL. The failure is at startup, before the first visitor. Local
+development is unaffected: with no token configured and a loopback URL, the guard
+allows through.
+
+### Registering against a platform-managed certificate
+
+`scripts/ans_register.py register` submits the identity CSR only. Fly issues and
+rotates the TLS certificate actually served, so sealing a `serverCerts[]`
+fingerprint we never present would make every callee verification fail — worse
+than publishing none. Pass `--with-server-cert` only where we terminate TLS
+ourselves and can serve exactly the registered certificate.

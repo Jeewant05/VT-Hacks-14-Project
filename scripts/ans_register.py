@@ -126,7 +126,7 @@ def step_generate(agent_id: str, domain: str, env: dict[str, str]) -> None:
     record(agent_id, host=host_for(agent_id, domain), ansName=ans_name_for(agent_id, domain))
 
 
-def step_register(agent_id: str, domain: str, env: dict[str, str]) -> None:
+def step_register(agent_id: str, domain: str, env: dict[str, str], with_server_cert: bool = False) -> None:
     out = material(agent_id)
     host = host_for(agent_id, domain)
     payload = run(
@@ -137,14 +137,20 @@ def step_register(agent_id: str, domain: str, env: dict[str, str]) -> None:
             "--version", VERSION,
             "--description", f"Synapse pre-merge coordination: {agent_id}",
             "--identity-csr", str(out / "identity.csr"),
-            "--server-csr", str(out / "server.csr"),
-            "--endpoint-url", f"https://{host}/mcp",
+            # HTTP-API, not MCP: no MCP transport is exposed, so declaring one
+            # would seal a false claim into the transparency log.
+            "--endpoint-url", f"https://{host}/api",
             "--metadata-url", f"https://{host}/.well-known/agent-card.json",
-            "--endpoint-protocol", "MCP",
-            "--endpoint-transports", "STREAMABLE-HTTP",
+            "--endpoint-protocol", "HTTP-API",
             "--function", "declare-contract:Declare API Contract:coordination",
             "--function", "submit-changeset:Submit ChangeSet:coordination",
             "--json",
+            # Identity certificate only by default. The platform issues and
+            # rotates the TLS certificate we actually serve, so registering a
+            # serverCerts[] fingerprint we never present would make every callee
+            # verification fail -- worse than publishing none. Pass
+            # --with-server-cert only where we control TLS termination.
+            *(["--server-csr", str(out / "server.csr")] if with_server_cert else []),
         ],
         env,
         capture_json=True,
@@ -225,6 +231,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("step", choices=sorted(STEPS))
     parser.add_argument("--agent", choices=sorted(AGENTS), action="append")
+    parser.add_argument(
+        "--with-server-cert", action="store_true",
+        help="also submit the server CSR; only where we control TLS termination",
+    )
     args = parser.parse_args()
 
     if shutil.which("ans-cli") is None:
@@ -239,7 +249,10 @@ def main() -> None:
     print(f"ANS {args.step}: {', '.join(targets)} under {settings.ans_domain}")
     for agent_id in targets:
         print(f"\n[{agent_id}]")
-        STEPS[args.step](agent_id, settings.ans_domain, env)
+        if args.step == "register":
+            step_register(agent_id, settings.ans_domain, env, args.with_server_cert)
+        else:
+            STEPS[args.step](agent_id, settings.ans_domain, env)
 
 
 if __name__ == "__main__":

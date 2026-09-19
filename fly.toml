@@ -1,0 +1,53 @@
+# Fly.io deployment for synapse-vt.us.
+#
+# One app serves the apex and the three agent subdomains; /.well-known/agent-card.json
+# is routed by Host so each registered agent answers with its own identity.
+#
+# Secrets are never in this file. Set them once with:
+#   fly secrets set ANS_API_KEY=... ANS_API_SECRET=... DEMO_TOKEN=...
+#
+# Certificates, after the DNS records point here:
+#   fly certs add synapse-vt.us
+#   fly certs add backend.synapse-vt.us
+#   fly certs add frontend.synapse-vt.us
+#   fly certs add telemetry.synapse-vt.us
+
+app = "synapse-vt"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  IDENTITY_MODE = "ans"
+  MEMORY_MODE = "cache"
+  TRACE_MODE = "cache"
+  # DPoP htu is compared against this, never against the request Host header.
+  ANS_PUBLIC_BASE_URL = "https://synapse-vt.us"
+  ANS_BASE_URL = "https://api.godaddy.com"
+  ANS_DOMAIN = "synapse-vt.us"
+  CORS_ORIGINS = "https://synapse-vt.us"
+  DATABASE_PATH = "/data/synapse.db"
+  # The runner posts here while signing for the public origin above.
+  LOCAL_BASE_URL = "http://127.0.0.1:8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 50
+    hard_limit = 100
+
+# SQLite and live-run artifacts must survive a redeploy.
+[[mounts]]
+  source = "synapse_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

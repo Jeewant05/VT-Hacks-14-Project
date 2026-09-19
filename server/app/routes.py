@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from server.app.ans.gate import build_authenticator, proven
 from server.app.ans.identity import AnsIdentity, AuthenticatedAgent
+from server.app.demo_runner import build_demo_guard
 from server.app.models import ApiContract, ChangeSet, WorkspaceState
 from server.app.service import Blocked, Coordinator, Forbidden, NotFound
 
@@ -38,8 +39,11 @@ def build_router(
     fresh_state,
     ans_identity: AnsIdentity | None = None,
     dpop_required: bool = True,
+    demo_token: str | None = None,
 ) -> APIRouter:
-    router = APIRouter()
+    # One rule for the whole API: everything under /api, static UI at /.
+    # DPoP htu binds the exact path, so dev and prod must agree.
+    router = APIRouter(prefix="/api")
     authenticate = build_authenticator(ans_identity, dpop_required)
 
     # Annotated form rather than a Depends() default: same wiring, and it keeps the
@@ -107,9 +111,14 @@ def build_router(
         except Blocked as e:
             raise HTTPException(409, str(e)) from e
 
-    @router.post("/reset", response_model=WorkspaceState)
+    @router.post("/reset", response_model=WorkspaceState,
+                 dependencies=[Depends(build_demo_guard(demo_token))])
     async def reset():
-        """Local demo only. Restores the seeded fixture."""
+        """Replace the workspace with the seeded fixture.
+
+        Destructive, so it is behind the shared demo secret: on a public
+        deployment an open reset lets anyone wipe the demo mid-presentation.
+        """
         return coordinator.reset(fresh_state())
 
     return router

@@ -5,10 +5,10 @@
     "version": "0.6.0"
   },
   "paths": {
-    "/health": {
+    "/api/health": {
       "get": {
         "summary": "Health",
-        "operationId": "health_health_get",
+        "operationId": "health_api_health_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -23,10 +23,10 @@
         }
       }
     },
-    "/state": {
+    "/api/state": {
       "get": {
         "summary": "State",
-        "operationId": "state_state_get",
+        "operationId": "state_api_state_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -41,10 +41,10 @@
         }
       }
     },
-    "/agents/{agent_id}/join": {
+    "/api/agents/{agent_id}/join": {
       "post": {
         "summary": "Join",
-        "operationId": "join_agents__agent_id__join_post",
+        "operationId": "join_api_agents__agent_id__join_post",
         "parameters": [
           {
             "name": "agent_id",
@@ -80,10 +80,10 @@
         }
       }
     },
-    "/workstreams/{ws_id}/claim": {
+    "/api/workstreams/{ws_id}/claim": {
       "post": {
         "summary": "Claim",
-        "operationId": "claim_workstreams__ws_id__claim_post",
+        "operationId": "claim_api_workstreams__ws_id__claim_post",
         "parameters": [
           {
             "name": "ws_id",
@@ -129,10 +129,10 @@
         }
       }
     },
-    "/workstreams/{ws_id}/declare": {
+    "/api/workstreams/{ws_id}/declare": {
       "post": {
         "summary": "Declare",
-        "operationId": "declare_workstreams__ws_id__declare_post",
+        "operationId": "declare_api_workstreams__ws_id__declare_post",
         "parameters": [
           {
             "name": "ws_id",
@@ -178,10 +178,10 @@
         }
       }
     },
-    "/workstreams/{ws_id}/scope": {
+    "/api/workstreams/{ws_id}/scope": {
       "post": {
         "summary": "Reassign Scope",
-        "operationId": "reassign_scope_workstreams__ws_id__scope_post",
+        "operationId": "reassign_scope_api_workstreams__ws_id__scope_post",
         "parameters": [
           {
             "name": "ws_id",
@@ -227,10 +227,10 @@
         }
       }
     },
-    "/workstreams/{ws_id}/submit": {
+    "/api/workstreams/{ws_id}/submit": {
       "post": {
         "summary": "Submit",
-        "operationId": "submit_workstreams__ws_id__submit_post",
+        "operationId": "submit_api_workstreams__ws_id__submit_post",
         "parameters": [
           {
             "name": "ws_id",
@@ -276,11 +276,29 @@
         }
       }
     },
-    "/reset": {
+    "/api/reset": {
       "post": {
         "summary": "Reset",
-        "description": "Local demo only. Restores the seeded fixture.",
-        "operationId": "reset_reset_post",
+        "description": "Replace the workspace with the seeded fixture.\n\nDestructive, so it is behind the shared demo secret: on a public\ndeployment an open reset lets anyone wipe the demo mid-presentation.",
+        "operationId": "reset_api_reset_post",
+        "parameters": [
+          {
+            "name": "x-demo-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Token"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -288,6 +306,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/WorkspaceState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -818,12 +846,40 @@
         ],
         "summary": "Config",
         "operationId": "config_live_config_get",
+        "parameters": [
+          {
+            "name": "x-demo-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Token"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -837,15 +893,33 @@
         ],
         "summary": "Start",
         "operationId": "start_live_runs_post",
+        "parameters": [
+          {
+            "name": "x-demo-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Token"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/LiveStartRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -887,6 +961,22 @@
               "type": "string",
               "title": "Run Id"
             }
+          },
+          {
+            "name": "x-demo-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Token"
+            }
           }
         ],
         "responses": {
@@ -927,6 +1017,22 @@
               "type": "string",
               "title": "Run Id"
             }
+          },
+          {
+            "name": "x-demo-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Token"
+            }
           }
         ],
         "responses": {
@@ -945,6 +1051,74 @@
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/demo/run": {
+      "post": {
+        "tags": [
+          "demo"
+        ],
+        "summary": "Run",
+        "operationId": "run_api_demo_run_post",
+        "parameters": [
+          {
+            "name": "x-demo-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoRunResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/agent-card.json": {
+      "get": {
+        "tags": [
+          "web"
+        ],
+        "summary": "Agent Card",
+        "operationId": "agent_card__well_known_agent_card_json_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           }
@@ -1285,6 +1459,38 @@
           "allowed_paths"
         ],
         "title": "DemoAgent"
+      },
+      "DemoRunResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "agents": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Agents"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "agents"
+        ],
+        "title": "DemoRunResponse"
       },
       "Event": {
         "properties": {

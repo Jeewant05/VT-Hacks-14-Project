@@ -8,8 +8,12 @@ from server.app.main import app
 
 def test_orchestration_api_v1_snapshot_is_unchanged():
     snapshot = json.loads((ROOT / "contracts" / "orchestration-api-v1.json").read_text())
+    # Selected by tag, not by the /api prefix: the coordinator router now shares
+    # that prefix, and this snapshot freezes the orchestration contract only.
+    # Filtering by tag still fails if an orchestration path is added or changed.
     current = {
-        path: operation for path, operation in app.openapi()["paths"].items()
-        if path.startswith("/api/")
+        path: operations
+        for path, operations in app.openapi()["paths"].items()
+        if any("orchestration" in op.get("tags", []) for op in operations.values())
     }
     assert snapshot == {"version": "v1", "paths": current}
