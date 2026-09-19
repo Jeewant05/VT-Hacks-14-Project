@@ -1,7 +1,7 @@
 import asyncio
 import json
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -17,8 +17,12 @@ class LiveRunResponse(BaseModel):
     status: str
 
 
-def build_live_router(runs: LiveRuns, model: str) -> APIRouter:
+def build_live_router(runs: LiveRuns, model: str, guard=None) -> APIRouter:
     router = APIRouter(prefix="/api/live", tags=["live-agents"])
+    # Only starting a run spends provider credit, so only that is gated.
+    # Reading config or following an existing run stays open, or the
+    # dashboard cannot even report which providers are configured.
+    billable = [Depends(guard)] if guard else []
 
     @router.get("/config")
     async def config():
@@ -36,7 +40,7 @@ def build_live_router(runs: LiveRuns, model: str) -> APIRouter:
             ],
         }
 
-    @router.post("/runs", response_model=LiveRunResponse)
+    @router.post("/runs", response_model=LiveRunResponse, dependencies=billable)
     async def start(body: LiveStartRequest):
         try:
             run = runs.start(body.objective)
