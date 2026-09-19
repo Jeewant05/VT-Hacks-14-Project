@@ -1,5 +1,24 @@
 # Agent clients
 
-Reserved for the deterministic demo clients and real coding-agent instructions. Both will call the same coordinator interfaces. No client or MCP tool is implemented in the foundation milestone.
+This directory contains deterministic scripted clients for testing the coordinator's
+public HTTP API. They are not autonomous agents and do not bypass the coordinator.
 
-P2 owns scripted clients; P1 owns their server-facing contracts. Use only the prepared backend/frontend workstreams. Never label a scripted client as an autonomous agent.
+## Run the agent smoke test
+
+Start a seeded server in another terminal:
+
+```sh
+npm run seed
+npm run dev:server
+```
+
+Then run:
+
+```sh
+uv run python -m agents.test_agents
+```
+
+The test verifies that both fixture agents can join and claim work, incompatible
+contracts open a conflict and reject a changeset with HTTP 409, and a compatible
+re-declaration lets both changesets complete the objective. Use `--base-url` to
+point at another API instance.

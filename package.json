@@ -16,8 +16,9 @@
     "contracts": "uv run python -m scripts.export_contracts && openapi-typescript contracts/openapi.json -o ui/src/api.generated.ts",
     "seed": "uv run python -m scripts.database seed",
     "reset": "uv run python -m scripts.database reset",
-    "check": "uv run ruff check server scripts && uv run pytest && npm run test --workspace ui && npm run build --workspace ui",
-    "rehearse": "uv run python -m scripts.rehearse"
+    "check": "uv run ruff check server scripts agents && uv run pytest && npm run test --workspace ui && npm run build --workspace ui",
+    "rehearse": "uv run python -m scripts.rehearse",
+    "agent-test": "uv run python -m agents.test_agents"
   },
   "devDependencies": {
     "concurrently": "^9.2.0",
