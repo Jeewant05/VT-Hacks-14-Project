@@ -2,14 +2,14 @@
 
 ## Live three-agent open-model demo
 
-1. Copy `.env.example` to `.env`, add an `HF_TOKEN` with Inference Providers permission, then run `npm run setup` and `npm run dev`.
+1. Copy `.env.example` to `.env`, add your ARC API key to the `ARC_API_KEY_BACKEND`, `ARC_API_KEY_FRONTEND`, and `ARC_API_KEY_QA` slots, then run `npm run setup` and `npm run dev`.
 2. Open the live dashboard, enter a small full-stack objective, and start the agents.
 3. Watch all three agents publish an intention. Explain that these plans are injected into every implementation prompt before any file is written.
 4. Point out that backend and frontend then build concurrently using separate APIs, exclusive directory ownership, and one shared contract.
 5. A waiting application tab opens immediately. The integration agent reviews the staged output; after validation, all files are committed to the run sandbox together.
 6. The waiting tab automatically switches to the finished application preview. If popups are blocked, use **Open finished app** in the dashboard.
 
-Be precise in the presentation: the displayed files and `frontend/preview.html` are genuinely returned through Hugging Face Inference Providers, written to an isolated local run directory, and committed to that run's Git repository. Synapse validates boundaries and serves the generated app in an opaque-origin browser sandbox. Inline JavaScript is allowed so games and workflows are interactive, while network access, parent-page access, external assets, navigation, and form submission remain blocked. Use the guided simulation when a token or network connection is unavailable.
+Be precise in the presentation: the displayed files and `frontend/preview.html` are genuinely returned by the configured provider (Virginia Tech ARC by default), written to an isolated local run directory, and committed to that run's Git repository. Synapse validates boundaries and serves the generated app in an opaque-origin browser sandbox. Inline JavaScript is allowed so games and workflows are interactive, while network access, parent-page access, external assets, navigation, and form submission remain blocked. Use the guided simulation when a token or network connection is unavailable.
 
 ## Foundation smoke check (available now)
 
@@ -29,9 +29,9 @@ Target: under three minutes, five clean runs, no manual database edits. Report t
 
 The pasted deadline is provisional: confirm this year's submission time and video requirements. Reserve relocation and sleep time. Submit ahead of the deadline; do not make code changes after the last clean rehearsal.
 
-## Live agents (Hugging Face)
+## Live agents (Virginia Tech ARC)
 
-Set in `.env`: `BACKEND_PROVIDER=huggingface`, `FRONTEND_PROVIDER=huggingface`, `QA_PROVIDER=huggingface`, and `HF_TOKEN`. The shared model defaults to `openai/gpt-oss-120b:fastest`; role-specific model overrides are optional. Restart `npm run dev:server`.
+Set in `.env`: `BACKEND_PROVIDER=arc`, `FRONTEND_PROVIDER=arc`, `QA_PROVIDER=arc`, and an ARC key in `ARC_API_KEY_BACKEND`, `ARC_API_KEY_FRONTEND`, and `ARC_API_KEY_QA`. The model defaults to `gpt-oss-120b`; role-specific `ARC_MODEL_*` overrides are optional. Restart `npm run dev:server`.
 
 In the dashboard start the three coding agents. They publish intentions first, backend and frontend build in parallel, integration reviews the staged files, and the coordinator commits the validated run artifacts. The frontend agent also generates a standalone interactive application that opens in the waiting tab after validation. Each card shows its actual provider and model.
 

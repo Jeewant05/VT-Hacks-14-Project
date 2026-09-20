@@ -12,7 +12,7 @@ Git catches conflicts after code is written. Synapse catches them before.
 |---|---|---|
 | **Coordinator** (the product) | `server/app/service.py`, `coordinator.py`, `routes.py`, `store.py` | State machine for agents and workstreams. Collision rules. Scope enforcement. Event log. |
 | **Adapters** (sponsor seams) | `server/app/adapters.py`, `server/app/ans/identity.py`, `tracing.py` | Identity verification (GoDaddy ANS) and event delivery (Databricks), each with a local fallback selected by `.env`. Decision memory is a local fixture. |
-| **Live agents** (demo scaffolding) | `server/app/live_agents.py`, `providers.py`, `live_routes.py` | Three model-driven agents that publish intentions, generate scoped project files, and stage them for validation. One provider/model per role; Hugging Face can route all three from one token. |
+| **Live agents** (demo scaffolding) | `server/app/live_agents.py`, `providers.py`, `live_routes.py` | Three model-driven agents that publish intentions, generate scoped project files, and stage them for validation. One provider and model per role; Virginia Tech ARC by default, Gemini or Hugging Face by `.env`. |
 | **Dashboard** | `ui/` | Drives the coordinator scene by calling the HTTP API. Renders coordinator events. Separate live-agent panel. |
 | **Scripted clients** | `agents/clients.py`, `scripts/scenario.sh` | Deterministic versions of the scene. Fail-safe when LLMs or wifi are unavailable. |
 

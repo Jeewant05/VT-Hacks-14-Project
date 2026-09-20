@@ -29,19 +29,20 @@ In that mode the dashboard is driven by the server-side runner, because a browse
 hold agent identity keys.
 
 
-## Live open-model coding demo
+## Live coding demo (Virginia Tech ARC)
 
-Create a fine-grained Hugging Face token with **Make calls to Inference Providers** permission, then add it to `.env`:
+Mint an API key at [llm.arc.vt.edu](https://llm.arc.vt.edu), then add it to `.env`:
 
 ```sh
-BACKEND_PROVIDER=huggingface
-FRONTEND_PROVIDER=huggingface
-QA_PROVIDER=huggingface
-HF_TOKEN=hf_your_token
-HUGGINGFACE_MODEL=openai/gpt-oss-120b:fastest
+BACKEND_PROVIDER=arc
+FRONTEND_PROVIDER=arc
+QA_PROVIDER=arc
+ARC_API_KEY_BACKEND=
+ARC_API_KEY_FRONTEND=
+ARC_API_KEY_QA=
 ```
 
-Hugging Face's Inference Providers router uses one token and can select the fastest available host for an open model. Set `HUGGINGFACE_MODEL_BACKEND`, `_FRONTEND`, and `_QA` if you want a different open model for each role; otherwise all three use `HUGGINGFACE_MODEL`. Provider-side account limits can still apply, so transient 429 and 5xx responses are retried with bounded backoff.
+ARC is an OpenAI-compatible chat-completions API at `llm-api.arc.vt.edu`, and each role picks its model through `ARC_MODEL_BACKEND`, `_FRONTEND`, and `_QA` (default `gpt-oss-120b`). Gemini and Hugging Face remain available through the `BACKEND_PROVIDER`, `FRONTEND_PROVIDER`, and `QA_PROVIDER` values. Provider-side limits can still apply, so transient 429 and 5xx responses are retried with bounded backoff.
 
 First, all three agents generate an intention in parallel. The coordinator shares those intentions with every agent, then starts implementation: backend and frontend build concurrently, and integration reviews their staged output. Nothing is written until every proposal passes ownership, path, duplicate, and size validation.
 
