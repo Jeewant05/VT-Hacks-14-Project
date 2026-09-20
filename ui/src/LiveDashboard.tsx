@@ -3,6 +3,7 @@ import {
   getLiveConfig, getLiveRun, startLiveRun, subscribeLiveRun,
   type LiveArtifact, type LiveConfig, type LiveEvent, type LiveSnapshot,
 } from './liveAgents';
+import { Logo } from './components';
 
 type Props = { onSimulation: () => void };
 const initialObjective = 'Build a small task manager with a FastAPI backend, React frontend, and contract tests.';
@@ -124,7 +125,7 @@ export function LiveDashboard({ onSimulation }: Props) {
 
   return <main className="live-shell">
     <header className="live-header">
-      <div><p className="eyebrow">SYNAPSE · OPEN MODEL CODE LAB</p><h1>Three agents. One coordinated project.</h1><p>Frontend and backend build in parallel. The integration agent reviews both, then the coordinator validates every generated path before writing it.</p></div>
+      <div><Logo /><p className="eyebrow">SYNAPSE · OPEN MODEL CODE LAB</p><h1>Three agents. One coordinated project.</h1><p>Frontend and backend build in parallel. The integration agent reviews both, then the coordinator validates every generated path before writing it.</p></div>
       <button className="secondary" onClick={onSimulation}>Open guided simulation</button>
     </header>
 
