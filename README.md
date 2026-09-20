@@ -14,7 +14,7 @@ npm run setup
 npm run dev
 ```
 
-Open http://127.0.0.1:5173. The dashboard should show **Coordinator connected**, the prepared OAuth objective, and three pending workstreams. API documentation is at http://127.0.0.1:8000/docs. Stop both services with Ctrl+C.
+Open http://127.0.0.1:5173. The dashboard opens on the live coding workspace; **Open workspace hub** shows the coordinator, integrations, and project memory. API documentation is at http://127.0.0.1:8000/docs. Stop both services with Ctrl+C.
 
 No credentials are required for the guided simulation. The default `IDENTITY_MODE=mock`
 uses a local allowlist: mock identity results are fixtures, not ANS verification, and
