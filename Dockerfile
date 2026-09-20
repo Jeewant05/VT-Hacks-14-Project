@@ -15,6 +15,13 @@ FROM python:3.13-slim AS runtime
 WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
+# Each live run initialises a Git repository for the code its agents generate
+# (server/app/live_agents.py runs `git init`), and the slim base image has no git.
+# Without it every run failed to start.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PROJECT_ENVIRONMENT=/app/.venv \

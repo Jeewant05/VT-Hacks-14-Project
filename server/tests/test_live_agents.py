@@ -455,3 +455,50 @@ def test_the_retry_tells_the_model_where_its_json_broke(tmp_path):
     assert run.status == "complete"
     retry = next(e for e in run.events if e["event_type"] == "proposal_retry")
     assert "was not valid JSON" in retry["message"] and "line" in retry["message"]
+
+
+# --- A run must never hang silently ------------------------------------------
+
+
+def test_a_missing_git_binary_fails_the_run_with_a_reason(tmp_path, monkeypatch):
+    """Live on the site: no `git` in the container, so every run hung.
+
+    `git init` ran outside execute()'s error handling, the background task died
+    with nothing recorded, and the run stayed in "planning" with no events and no
+    error. The dashboard keeps its buttons disabled behind a run in that state, so
+    the whole page looked dead.
+    """
+
+    async def no_git(*args, **kwargs):
+        raise FileNotFoundError(2, "No such file or directory", "git")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", no_git)
+    run = LiveRun("run-nogit", "Build tasks", tmp_path / "run-nogit", providers())
+
+    asyncio.run(run.execute())
+
+    assert run.status == "failed"  # not stuck in "planning"
+    assert "git is not installed" in run.snapshot()["error"]
+    assert run.events[-1]["event_type"] == "run_failed"
+    assert run.snapshot()["failure_title"] == "The server could not set up this run's workspace."
+
+
+def test_a_run_whose_directory_cannot_be_created_still_reports_failure(tmp_path):
+    """The failure handler saves state; that must not raise when there is no directory."""
+    blocker = tmp_path / "blocked"
+    blocker.write_text("a file where the run directory should go")
+    run = LiveRun("run-blocked", "Build tasks", blocker / "run", providers())
+
+    asyncio.run(run.execute())  # raises out of the handler if _persist is unsafe
+
+    assert run.status == "failed"
+    assert run.snapshot()["error"]
+
+
+def test_the_container_image_installs_git():
+    """The cause was the environment, not the code, so guard the Dockerfile itself."""
+    from server.app.config import ROOT
+
+    dockerfile = (ROOT / "Dockerfile").read_text()
+    runtime = dockerfile[dockerfile.index("AS runtime"):]
+    assert "apt-get install" in runtime and " git" in runtime

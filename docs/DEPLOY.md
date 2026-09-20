@@ -21,6 +21,7 @@ with it. Nothing secret belongs here.
 | `DATABASE_PATH` | `/data/synapse.db` | On the volume, so it survives a redeploy |
 | `LOCAL_BASE_URL` | `http://127.0.0.1:8080` | Where the runner posts while signing for the public origin |
 | `BACKEND_PROVIDER` / `FRONTEND_PROVIDER` / `QA_PROVIDER` | `gemini` | Live coding agents |
+| `ORCHESTRATOR_PROVIDER` | `gemini` | Proposes conflict resolutions. Falls back to deterministic proposals if its key is unset or a call fails |
 | `GEMINI_MODEL` | `gemini-3.6-flash` | Optional: equals the code default, pinned here so a change to the default cannot silently change production |
 
 **Fly secrets** — `fly secrets set`, or the dashboard's batch import.
@@ -30,8 +31,26 @@ with it. Nothing secret belongs here.
 | `ANS_API_KEY` / `ANS_API_SECRET` | GoDaddy ANS credentials. Stored split; composed into `key:secret` on use |
 | `DEMO_TOKEN` | Operator secret for `/api/reset` only. Everything else the dashboard does is open |
 | `ANS_AGENT_IDENTITIES` | JSON of base64 PEM cert+key per agent, for the server-side runner |
-| `GEMINI_API_KEY_BACKEND` / `_FRONTEND` / `_QA` | One Gemini key per live agent, so the three concurrent agents do not share a rate limit. `GEMINI_API_KEY` is accepted as a single shared fallback |
+| `GEMINI_API_KEY_BACKEND` / `_FRONTEND` / `_QA` / `_ORCHESTRATOR` | One Gemini key per agent. Gemini quota is per Google project, not per key, so separate keys only isolate the agents if each is in its own project; on one billed project the limit is high enough not to matter. `GEMINI_API_KEY` is accepted as a single shared fallback |
 | `ACME_CHALLENGES` | HTTP-01 responses. Only needed while registering; safe to drop once every agent is ACTIVE |
+
+## Local development uses ARC; the deployed build uses Gemini
+
+The same code runs in both places and only configuration differs.
+
+| | Local development | Deployed (Fly) |
+| --- | --- | --- |
+| Live-agent provider | `arc` (VT ARC, `llm-api.arc.vt.edu`) | `gemini` |
+| Configured in | a local, gitignored `.env` | `fly.toml` `[env]` plus Fly secrets |
+| Keys | `ARC_API_KEY_*`, personal to the developer | `GEMINI_API_KEY_*` Fly secrets |
+
+ARC cannot be used from Fly. It only answers requests from VT's network (eduroam) or the
+Ivanti VPN, and refuses Fly's datacenter addresses with a `403`. It is also a personal
+service: ARC's terms prohibit sharing a key, so a public site should not spend one.
+
+Nothing local leaks into the deployment. Fly reads only `fly.toml` and its own secrets,
+and `.dockerignore` excludes `.env` and `.env.*`, so ARC keys or a Databricks token in a
+developer's `.env` are never copied into the image.
 
 ## The app refuses to start misconfigured
 

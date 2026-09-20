@@ -25,8 +25,18 @@ HOSTS = {
 }
 
 
+# Settings() reads the developer's .env. With live providers and keys configured
+# there, POST /api/live/runs would start a real run against the provider: slow,
+# billable, and different on every machine. These tests only care about routing
+# and auth, so every provider is pinned off.
+NO_PROVIDERS = dict(
+    backend_provider="none", frontend_provider="none", qa_provider="none",
+    orchestrator_provider="none",
+)
+
+
 def client(tmp_path):
-    return TestClient(create_app(Settings(demo_token=None, database_path=tmp_path / "web.db", ans_domain=DOMAIN)))
+    return TestClient(create_app(Settings(demo_token=None, database_path=tmp_path / "web.db", ans_domain=DOMAIN, **NO_PROVIDERS)))
 
 
 def test_agent_card_ansname_matches_the_host_it_is_served_on(tmp_path):
@@ -135,7 +145,7 @@ def test_malformed_acme_config_does_not_break_startup(tmp_path):
 
 def guarded(tmp_path):
     return TestClient(create_app(Settings(
-        demo_token="s3cret", database_path=tmp_path / "guard.db", ans_domain=DOMAIN,
+        demo_token="s3cret", database_path=tmp_path / "guard.db", ans_domain=DOMAIN, **NO_PROVIDERS,
     )))
 
 

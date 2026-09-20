@@ -33,13 +33,22 @@ primary_region = "iad"
   # Transparency log that ANS registration returned badge URLs on.
   ANS_TRUSTED_TL_HOSTS = "transparency.ans.godaddy.com,api.godaddy.com"
 
-  # Live coding agents run on Gemini, one API key per role
-  # (GEMINI_API_KEY_BACKEND / _FRONTEND / _QA, all Fly secrets) so the three
-  # concurrent agents do not share one rate limit. Provider and model selection
-  # are plain config; only the keys are secret.
+  # The deployed build runs its live agents on Gemini. Local development uses
+  # VT ARC (ARC_API_KEY_* in a local .env), which cannot be used here: ARC only
+  # answers requests from VT's network or VPN and refuses Fly with a 403.
+  # Provider and model selection are plain config; only the keys are secret.
+  #
+  # Keys are one per role (GEMINI_API_KEY_BACKEND / _FRONTEND / _QA /
+  # _ORCHESTRATOR, all Fly secrets). Gemini quota is per Google project, not per
+  # key, so separate keys only isolate the agents if each lives in its own
+  # project; with billing enabled on one project the limit is high enough not to
+  # matter.
   BACKEND_PROVIDER = "gemini"
   FRONTEND_PROVIDER = "gemini"
   QA_PROVIDER = "gemini"
+  # Proposes conflict resolutions. Falls back to deterministic proposals when
+  # GEMINI_API_KEY_ORCHESTRATOR is unset or the call fails.
+  ORCHESTRATOR_PROVIDER = "gemini"
   GEMINI_MODEL = "gemini-3.6-flash"
 
 [http_service]

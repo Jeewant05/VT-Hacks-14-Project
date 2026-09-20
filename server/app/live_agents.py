@@ -71,6 +71,8 @@ def explain_failure(message: str) -> str:
         return f"{provider} is temporarily overloaded. Try again shortly."
     if "is not set" in text or "not configured" in text:
         return "A live-agent provider key is not configured."
+    if "workspace" in text:
+        return "The server could not set up this run's workspace."
     if any(word in text for word in ("timeout", "timed out", "connection")):
         return f"{provider} could not be reached."
     return "The agent build failed validation."
@@ -147,20 +149,33 @@ class LiveRun:
             "failure_title": explain_failure(self.error) if self.error else None,
         }
 
-    async def execute(self) -> None:
-        self.status = "planning"
+    async def _init_workspace(self) -> None:
+        """Create the run's directory and initialise a Git repository in it."""
         self.root.mkdir(parents=True, exist_ok=False)
-        git = await asyncio.create_subprocess_exec(
-            "git", "init", "-b", "main", cwd=self.root,
-            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
-        )
+        try:
+            git = await asyncio.create_subprocess_exec(
+                "git", "init", "-b", "main", cwd=self.root,
+                stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+            )
+        except FileNotFoundError as exc:
+            raise RuntimeError(
+                "git is not installed in this environment, so the run's workspace "
+                "could not be created"
+            ) from exc
         if await git.wait() != 0:
             raise RuntimeError("could not initialize the generated Git workspace")
         self._persist()
-        self.emit("coordinator", "run_started", "Created an isolated project workspace")
-        contract = self._contract()
 
+    async def execute(self) -> None:
+        self.status = "planning"
         try:
+            # Inside the handler on purpose. This ran outside it once, and a missing
+            # `git` binary killed the background task with nothing recorded: the run
+            # sat in "planning" forever with no events and no error, and the
+            # dashboard's buttons stayed disabled behind it.
+            await self._init_workspace()
+            self.emit("coordinator", "run_started", "Created an isolated project workspace")
+            contract = self._contract()
             plans = await asyncio.gather(*(self._plan(role, contract) for role in ROLES))
             self.intentions = {role.id: plan for role, plan in zip(ROLES, plans, strict=True)}
             self.emit(
@@ -373,6 +388,11 @@ Hard limits -- a response outside them is rejected:
         self.artifacts.append(artifact)
 
     def _persist(self) -> None:
+        if not self.root.is_dir():
+            # A run that failed before its workspace existed has nowhere to save
+            # to. Raising here would escape the failure handler and hide the very
+            # error that is being recorded.
+            return
         data = self.snapshot() | {"preview_html": self.preview_html}
         (self.root / ".synapse-run.json").write_text(
             json.dumps(data, indent=2) + "\n", encoding="utf-8"
