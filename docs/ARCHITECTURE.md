@@ -11,7 +11,7 @@ Git catches conflicts after code is written. Synapse catches them before.
 | Layer | Files | Purpose |
 |---|---|---|
 | **Coordinator** (the product) | `server/app/service.py`, `coordinator.py`, `routes.py`, `store.py` | State machine for agents and workstreams. Collision rules. Scope enforcement. Event log. |
-| **Adapters** (sponsor seams) | `server/app/adapters.py`, `identity_ans.py`, `memory_databricks.py`, `tracing.py` | Identity verification (GoDaddy ANS) and decision memory / event delivery (Databricks). Each has a local fallback selected by `.env`. |
+| **Adapters** (sponsor seams) | `server/app/adapters.py`, `server/app/ans/identity.py`, `tracing.py` | Identity verification (GoDaddy ANS) and event delivery (Databricks), each with a local fallback selected by `.env`. Decision memory is a local fixture. |
 | **Live agents** (demo scaffolding) | `server/app/live_agents.py`, `providers.py`, `live_routes.py` | Three model-driven agents that publish intentions, generate scoped project files, and stage them for validation. One provider/model per role; Hugging Face can route all three from one token. |
 | **Dashboard** | `ui/` | Drives the coordinator scene by calling the HTTP API. Renders coordinator events. Separate live-agent panel. |
 | **Scripted clients** | `agents/clients.py`, `scripts/scenario.sh` | Deterministic versions of the scene. Fail-safe when LLMs or wifi are unavailable. |
@@ -39,14 +39,14 @@ Collision detection is deterministic on purpose. The same inputs produce the sam
 ## Sponsor integrations
 
 - **GoDaddy ANS** → `IdentityAdapter.verify(agent)`. Turn on with `IDENTITY_MODE=ans`. Proves who each agent is before it may act; a revoked agent is refused at join.
-- **Databricks** → `MemoryAdapter.search/log` and `TraceSink.log`. Turn on with `MEMORY_MODE=databricks`. Past decisions retrieved at the moment of conflict; every event delivered to a Delta table.
+- **Databricks** → `TraceSink.log`. Turn on with `TRACE_MODE=databricks`. Every coordinator event is delivered to a Delta table and read back at `GET /api/traces`. `MemoryAdapter.search` is a local fixture in every mode; past decisions are read from the seeded fixture, not from Databricks.
 
 Both default to local fixtures so a fresh clone runs with no credentials. Flipping one `.env` line switches modes; that is the fail-safe.
 
 ## Fail-safe chain, best to worst
 
 1. Dashboard + live LLM agents + real ANS + real Databricks
-2. Flip `IDENTITY_MODE` / `MEMORY_MODE` back to local
+2. Flip `IDENTITY_MODE` / `TRACE_MODE` back to local
 3. Open the credential-free guided simulation
 4. `bash scripts/scenario.sh` in a terminal, Swagger at `/docs`
 5. Recorded video
