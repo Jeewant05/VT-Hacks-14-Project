@@ -230,15 +230,17 @@ proofs are real: each agent signs against `ANS_PUBLIC_BASE_URL` while the reques
 travels over loopback, which verifies because an ANS-6 verifier compares `htu`
 against configured authority and never reads the `Host` header.
 
-The dashboard asks for `DEMO_TOKEN` once per tab and keeps it in
-`sessionStorage`. It is an operator secret, not a user session.
+The runner is open — the dashboard presses it with no prompt. It never resets, so
+replaying it cannot lose state. Only Reset asks for `DEMO_TOKEN`, and only when
+`/api/health` reports `reset_requires_token`; the UI keeps the token in
+`sessionStorage` after the server accepts it, and forgets it if the server does not.
 
 ### Fail closed by construction
 
 `require_demo_token_for_public()` refuses to build the app when
-`ANS_PUBLIC_BASE_URL` is a public host and `DEMO_TOKEN` is unset — `/api/reset`,
-`/api/demo/run` and the live-agent routes would otherwise be open to anyone who
-finds the URL. The failure is at startup, before the first visitor. Local
+`ANS_PUBLIC_BASE_URL` is a public host and `DEMO_TOKEN` is unset — `/api/reset`
+would otherwise let anyone who finds the URL wipe the workspace. The failure is at
+startup, before the first visitor. Local
 development is unaffected: with no token configured and a loopback URL, the guard
 allows through.
 

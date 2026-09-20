@@ -85,19 +85,20 @@ export function useCoordinator() {
 
   const setAction = (action: PendingAction) => { pendingRef.current = action; setPending(action); };
 
-  // Operator secret for destructive endpoints. Held for the tab only, never
-  // persisted: it authorizes resets and demo runs, not a user session.
-  const demoToken = useCallback((): string | null => {
-    try {
-      const held = sessionStorage.getItem('synapse-demo-token');
-      if (held) return held;
-      const entered = window.prompt('Demo token (set as DEMO_TOKEN on the server)');
-      if (entered) sessionStorage.setItem('synapse-demo-token', entered);
-      return entered;
-    } catch {
-      return null; // Private mode or blocked storage: fall back to no token.
-    }
-  }, []);
+  // Reset is the only endpoint behind the operator secret, and only when the
+  // server says so (health.reset_requires_token). The secret is kept for the tab,
+  // never persisted, and only after the server has accepted it: caching what was
+  // typed made one typo stick until the tab closed.
+  const TOKEN_KEY = 'synapse-demo-token';
+  const readToken = (): string | null => {
+    try { return sessionStorage.getItem(TOKEN_KEY); } catch { return null; }
+  };
+  const rememberToken = (token: string) => {
+    try { sessionStorage.setItem(TOKEN_KEY, token); } catch { /* blocked storage: ask again next time */ }
+  };
+  const forgetToken = () => {
+    try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* nothing held */ }
+  };
 
   const request = useCallback(async <T,>(path: string, init?: RequestInit, token?: string | null): Promise<T> => {
     const headers: Record<string, string> = {};
@@ -136,6 +137,22 @@ export function useCoordinator() {
     return next;
   }, [request]);
 
+  const resetWorkspace = useCallback(async () => {
+    if (!health?.reset_requires_token) return post('/reset');
+    const held = readToken();
+    const token = held ?? window.prompt('Reset needs the demo token (DEMO_TOKEN on the server).');
+    if (!token) throw new Error('Reset was cancelled: it needs the demo token.');
+    try {
+      const next = await post('/reset', undefined, token);
+      rememberToken(token);
+      return next;
+    } catch (failure) {
+      forgetToken();
+      const rejected = failure instanceof Error && /X-Demo-Token/.test(failure.message);
+      throw rejected ? new Error('That demo token was not accepted. Press Reset to try again.') : failure;
+    }
+  }, [post, health]);
+
   const perform = useCallback(async (action: Exclude<PendingAction, null>, task: () => Promise<void>) => {
     setAction(action); setError(null);
     try { await task(); return true; }
@@ -148,13 +165,12 @@ export function useCoordinator() {
     // identity key, and a browser must never hold those. The server runs the
     // scripted agents instead; the dashboard polls /state to follow along.
     if (health?.dpop_required) {
-      const token = demoToken();
-      await request<{ status: string; detail?: string }>('/demo/run', { method: 'POST' }, token)
-        .then(result => { if (result.status !== 'complete') throw new Error(result.detail ?? 'Demo run failed.'); });
+      const result = await request<{ status: string; detail?: string }>('/demo/run', { method: 'POST' });
+      if (result.status !== 'complete') throw new Error(result.detail ?? 'Demo run failed.');
       await refresh();
       return;
     }
-    await post('/reset');
+    await resetWorkspace();
     await post('/agents/backend-agent/join');
     await post('/agents/frontend-agent/join');
     await post('/agents/telemetry-agent/join');
@@ -164,7 +180,7 @@ export function useCoordinator() {
     await post('/workstreams/backend/declare', { agent_id: 'backend-agent', contract: contract('provides', approvedFields) });
     await post('/workstreams/frontend/declare', { agent_id: 'frontend-agent', contract: contract('consumes', approvedFields) });
     await post('/workstreams/telemetry/declare', { agent_id: 'telemetry-agent', contract: contract('consumes', approvedFields) });
-  }), [perform, post, health, demoToken, request, refresh]);
+  }), [perform, post, resetWorkspace, health, request, refresh]);
 
   const applyPlan = useCallback(() => perform('coordinate', async () => {
     await post('/workstreams/backend/scope', { agent_id: 'backend-agent', owned_paths: ['src/api/auth/oauth.ts', 'src/auth/session.ts', 'src/api/auth/oauth.test.ts'] });
@@ -204,7 +220,7 @@ export function useCoordinator() {
     await post('/workstreams/telemetry/submit', telemetry);
   }), [perform, post]);
 
-  const reset = useCallback(() => perform('reset', async () => { await post('/reset', undefined, health?.dpop_required ? demoToken() : null); }), [perform, post, health, demoToken]);
+  const reset = useCallback(() => perform('reset', async () => { await resetWorkspace(); }), [perform, resetWorkspace]);
   const demo = useMemo(() => workspaceToDemo(workspace, pending), [workspace, pending]);
 
   return {

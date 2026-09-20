@@ -20,7 +20,7 @@ import asyncio
 import logging
 import secrets
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 
 from agents.clients import APPROVED_CONTRACT, CONSUMER_CONTRACT, PASSED_TEST, AgentClient
@@ -94,9 +94,10 @@ def _run(settings: Settings, local_base: str) -> DemoRunResponse:
 def build_demo_guard(demo_token: str | None):
     """Dependency requiring the shared demo secret.
 
-    Used for the runner, `/reset` and the live-agent routes -- all of which are
-    destructive or cost money, and none of which a stranger who finds the URL
-    should be able to trigger.
+    Guards `/reset` only. It is the one endpoint that destroys state, so it is
+    the one a stranger who finds the URL must not be able to trigger. Live runs
+    and the demo runner are deliberately open: the dashboard has to work without
+    a prompt, and the cost of that choice is provider credit, not lost data.
     """
 
     def guard(x_demo_token: str | None = Header(default=None)) -> None:
@@ -116,7 +117,7 @@ LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1", "0.0.0.0", "testserver"}
 
 
 def require_demo_token_for_public(settings: Settings) -> None:
-    """Refuse to start a public deployment with destructive endpoints open.
+    """Refuse to start a public deployment whose /reset is open.
 
     Checked at startup rather than per request so the failure is loud and happens
     before the first visitor, not after.
@@ -128,14 +129,14 @@ def require_demo_token_for_public(settings: Settings) -> None:
         return
     raise RuntimeError(
         f"ANS_PUBLIC_BASE_URL is public ({host}) but DEMO_TOKEN is unset. "
-        "/api/reset, /api/demo/run and the live-agent routes would be open to "
-        "anyone. Set DEMO_TOKEN."
+        "/api/reset would let anyone wipe the workspace. Set DEMO_TOKEN."
     )
 
 
-def build_demo_router(settings: Settings, demo_token: str | None, local_base: str) -> APIRouter:
-    router = APIRouter(prefix="/api/demo", tags=["demo"],
-                       dependencies=[Depends(build_demo_guard(demo_token))])
+def build_demo_router(settings: Settings, local_base: str) -> APIRouter:
+    # Open on purpose: this is the button the dashboard presses. It is not
+    # destructive -- it never resets -- so replaying it cannot lose state.
+    router = APIRouter(prefix="/api/demo", tags=["demo"])
 
     @router.post("/run", response_model=DemoRunResponse)
     async def run() -> DemoRunResponse:

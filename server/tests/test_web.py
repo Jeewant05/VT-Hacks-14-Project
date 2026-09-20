@@ -128,3 +128,47 @@ def test_malformed_acme_config_does_not_break_startup(tmp_path):
             acme_challenges=raw,
         ))
         assert TestClient(app).get("/api/health").status_code == 200
+
+
+# --- DEMO_TOKEN guards /api/reset and nothing else ---------------------------
+
+
+def guarded(tmp_path):
+    return TestClient(create_app(Settings(
+        demo_token="s3cret", database_path=tmp_path / "guard.db", ans_domain=DOMAIN,
+    )))
+
+
+def test_reset_requires_the_token_when_one_is_configured(tmp_path):
+    """Reset destroys state, so it is the one endpoint a stranger must not reach."""
+    c = guarded(tmp_path)
+    assert c.post("/api/reset").status_code == 401
+    assert c.post("/api/reset", headers={"X-Demo-Token": "wrong"}).status_code == 401
+    assert c.post("/api/reset", headers={"X-Demo-Token": "s3cret"}).status_code == 200
+
+
+def test_live_runs_and_the_demo_runner_are_open(tmp_path):
+    """The dashboard presses these with no prompt, so they must not need the token.
+
+    Neither may answer 401. The status they do return without providers or
+    identity material configured is beside the point here.
+    """
+    c = guarded(tmp_path)
+    assert c.post("/api/live/runs", json={"objective": "Build tasks"}).status_code != 401
+    assert c.post("/api/demo/run").status_code != 401
+    assert c.get("/api/live/config").status_code == 200
+
+
+def test_health_tells_the_ui_whether_reset_needs_a_token(tmp_path):
+    assert guarded(tmp_path).get("/api/health").json()["reset_requires_token"] is True
+    assert client(tmp_path).get("/api/health").json()["reset_requires_token"] is False
+
+
+def test_a_public_deployment_still_refuses_to_start_with_reset_open(tmp_path):
+    import pytest
+
+    with pytest.raises(RuntimeError, match="/api/reset"):
+        create_app(Settings(
+            demo_token=None, database_path=tmp_path / "pub.db",
+            ans_public_base_url="https://synapse-vt.us", ans_domain=DOMAIN,
+        ))

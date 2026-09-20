@@ -157,3 +157,66 @@ def test_live_config_reports_each_missing_api(tmp_path):
     assert [role["configured"] for role in config.json()["roles"]] == [False, False, False]
     assert start.status_code == 503
     assert "backend, frontend, integration" in start.json()["detail"]
+
+
+# --- Why a run failed ---------------------------------------------------------
+
+
+class RejectingProvider:
+    """A provider whose upstream refuses every request, as with a spent account."""
+
+    name = "huggingface"
+    model = "openai/gpt-oss-120b:fastest"
+
+    def __init__(self, message: str):
+        self.message = message
+
+    async def generate(self, prompt: str) -> str:
+        raise RuntimeError(self.message)
+
+
+CREDITS = 'huggingface 402: {"error":"You have depleted your monthly included credits."}'
+
+
+def test_a_provider_rejection_is_not_reported_as_a_validation_failure(tmp_path):
+    """No code is generated when the provider refuses, so there is nothing to validate.
+
+    This surfaced as "The build did not pass validation" on the live site while
+    the real cause was an out-of-credits account, which sent the operator to
+    debug generated code that never existed.
+    """
+    rejecting = {role: RejectingProvider(CREDITS) for role in ("backend", "frontend", "integration")}
+    run = LiveRun("run-402", "Build tasks", tmp_path / "run-402", rejecting)
+
+    asyncio.run(run.execute())
+
+    snapshot = run.snapshot()
+    assert snapshot["status"] == "failed"
+    assert "402" in snapshot["error"]
+    assert snapshot["failure_title"] == "huggingface rejected the request: the account is out of credits."
+    assert "validation" not in snapshot["failure_title"]
+
+
+def test_a_successful_run_reports_no_failure(tmp_path):
+    run = LiveRun("run-ok", "Build tasks", tmp_path / "run-ok", providers())
+    asyncio.run(run.execute())
+    snapshot = run.snapshot()
+    assert snapshot["status"] == "complete"
+    assert snapshot["error"] is None and snapshot["failure_title"] is None
+
+
+def test_genuine_validation_failures_keep_the_validation_wording(tmp_path):
+    run = LiveRun("run-bad", "Build tasks", tmp_path / "run-bad", providers(invalid_frontend=True))
+    asyncio.run(run.execute())
+    assert run.status == "failed"
+    assert run.snapshot()["failure_title"] == "The agent build failed validation."
+
+
+def test_failure_headlines_name_the_actual_cause():
+    from server.app.live_agents import explain_failure
+
+    assert "out of credits" in explain_failure(CREDITS)
+    assert "rejected the API key" in explain_failure("huggingface 401: bad token")
+    assert "rate limiting" in explain_failure("groq 429: rate limit exceeded")
+    assert "not configured" in explain_failure("HUGGINGFACE_API_KEY is not set")
+    assert "could not be reached" in explain_failure("huggingface request timed out")

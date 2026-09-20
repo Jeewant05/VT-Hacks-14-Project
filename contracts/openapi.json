@@ -865,33 +865,15 @@
         ],
         "summary": "Start",
         "operationId": "start_api_live_runs_post",
-        "parameters": [
-          {
-            "name": "x-demo-token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Demo-Token"
-            }
-          }
-        ],
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/LiveStartRequest"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -1046,24 +1028,6 @@
         ],
         "summary": "Run",
         "operationId": "run_api_demo_run_post",
-        "parameters": [
-          {
-            "name": "x-demo-token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Demo-Token"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1071,16 +1035,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DemoRunResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -1643,6 +1597,11 @@
           "dpop_required": {
             "type": "boolean",
             "title": "Dpop Required",
+            "default": false
+          },
+          "reset_requires_token": {
+            "type": "boolean",
+            "title": "Reset Requires Token",
             "default": false
           }
         },
