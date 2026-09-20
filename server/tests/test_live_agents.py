@@ -296,3 +296,18 @@ def test_an_empty_answer_is_reported_as_empty_not_as_a_bad_count(tmp_path):
     asyncio.run(run.execute())
     assert run.status == "failed"
     assert "returned no files" in run.snapshot()["error"]
+
+
+# --- Provider overload: retried, then explained -------------------------------
+
+
+def test_an_overload_is_named_as_such_not_as_a_validation_failure():
+    from server.app.live_agents import explain_failure
+
+    spike = 'gemini 503: {"error":{"message":"This model is currently experiencing high demand."}}'
+    assert explain_failure(spike) == "gemini is temporarily overloaded. Try again shortly."
+    assert "overloaded" in explain_failure("huggingface 502: bad gateway")
+    # A genuine validation error must not be mistaken for an overload.
+    assert explain_failure("backend returned 9 files; it must return 1-6") == (
+        "The agent build failed validation."
+    )

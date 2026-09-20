@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -66,6 +67,8 @@ def explain_failure(message: str) -> str:
         return f"{provider} rejected the API key."
     if " 429" in text or "rate limit" in text:
         return f"{provider} is rate limiting requests. Try again shortly."
+    if re.search(r" 5\d\d\b", text) or "unavailable" in text or "high demand" in text:
+        return f"{provider} is temporarily overloaded. Try again shortly."
     if "is not set" in text or "not configured" in text:
         return "A live-agent provider key is not configured."
     if any(word in text for word in ("timeout", "timed out", "connection")):
