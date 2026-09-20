@@ -421,3 +421,31 @@ main:focus { outline: none; }
 .error-card { background: #fff0ec; border: 1px solid #e6b4a9; border-radius: 10px; padding: 15px; max-width: 1180px; color: #874c32; }.error-card pre { white-space: pre-wrap; overflow: auto; }.event-list { padding: 0; margin: 16px 0 0; list-style: none; max-height: 440px; overflow: auto; }.event-list li { border-bottom: 1px solid #edf1ed; padding: 12px 0; }.event-list b { color: #247457; margin-right: 8px; }.event-list span { font-size: .72rem; color: #77857a; }.event-list p { margin: 5px 0; color: #3e5145; font-size: .82rem; }.empty { color: #7a887c; font-size: .82rem; }
 @media (max-width: 1000px) { .live-workspace { grid-template-columns: 1fr; } }
 @media (max-width: 800px) { .live-header { display: block; }.live-header .secondary { margin-top: 16px; }.live-agent-grid, .live-workspace { grid-template-columns: 1fr; }.artifact-browser { grid-template-columns: 1fr; }.artifact-browser nav { border-right: 0; border-bottom: 1px solid #e1e9e2; max-height: 180px; }.prompt-heading, .prompt-actions { align-items: flex-start; flex-direction: column; }.prompt-actions > span { margin-left: 0; } }
+
+/* --- shared polish --- */
+/* Appended so it overrides the live-shell rules above without rewriting them. */
+
+.live-shell { background: var(--page); color: var(--ink); }
+.prompt-card, .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.error-card { border-radius: var(--radius); }
+.agent-card-live { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.prompt-card textarea { border-color: var(--line); }
+
+.primary, .secondary { border-radius: 7px; border: 1px solid var(--line); font-weight: 560; }
+.primary { background: var(--green); color: white; border-color: var(--green); }
+.primary:hover:not(:disabled) { background: var(--green-dark); border-color: var(--green-dark); }
+.secondary { background: var(--surface); color: var(--ink); }
+.secondary:hover:not(:disabled) { background: #edf3ed; border-color: #b8c9bb; }
+
+/* One card gesture across both views. */
+.agent-card, .agent-card-live, .decision-row, .integration-row { transition: transform 160ms ease-out, box-shadow 160ms ease-out, background-color 160ms ease-out; }
+.agent-card:hover, .agent-card-live:hover, .decision-row:hover, .integration-row:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+.decision-row:hover, .integration-row:hover { background: var(--surface); border-radius: var(--radius); }
+
+.empty, .activity-empty { color: var(--muted); font-size: .78rem; }
+.code-block, .artifact-preview pre { font: .78rem/1.65 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; }
+.code-block { border-radius: var(--radius); }
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-card:hover, .agent-card-live:hover, .decision-row:hover, .integration-row:hover { transform: none; }
+}
