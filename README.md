@@ -50,7 +50,7 @@ Every proposed path is checked against its role (`backend/**`, `frontend/**`, or
 
 ## Databricks trace layer
 
-Set `TRACE_MODE=databricks` with `DATABRICKS_HOST`, `DATABRICKS_TOKEN`, `DATABRICKS_WAREHOUSE_ID`, `DATABRICKS_CATALOG`, and `DATABRICKS_SCHEMA` to persist coordinator and live-agent events. Create the destination from [the trace schema](docs/databricks-trace-schema.sql). `GET /traces` reads the newest records; `GET /traces?run_id=run-…` filters a live run. Incomplete settings safely retain the in-process cache trace store.
+Set `TRACE_MODE=databricks` with `DATABRICKS_HOST`, `DATABRICKS_TOKEN`, `DATABRICKS_WAREHOUSE_ID`, `DATABRICKS_CATALOG`, and `DATABRICKS_SCHEMA` to persist coordinator and live-agent events. Create the destination from [the trace schema](docs/databricks-trace-schema.sql). `GET /api/traces` reads the newest records; `GET /api/traces?run_id=run-…` filters a live run. Incomplete settings safely retain the in-process cache trace store.
 
 ## Commands
 
@@ -83,10 +83,10 @@ The database defaults to `.local/synapse.db`. Reset touches only local workspace
 
 Pydantic models in `server/app/models.py` are the source of truth. Run `npm run contracts` after model or endpoint changes, and commit all generated files. Do not edit `ui/src/api.generated.ts` manually. Exact dependency resolutions are committed in `uv.lock` and `package-lock.json`; use `uv sync --locked` and `npm ci` for repeatable installs.
 
-The coordinator exposes health/state reads plus agent join, workstream claim, contract declaration, scope reassignment, ChangeSet submission, and local reset endpoints. The guided UI calls these endpoints through the Vite `/api` proxy. An MCP server (`uv run python -m server.mcp_server`, stdio) exposes the same six operations as tools, so any MCP-capable coding agent can join, declare, scope and submit through the coordinator. Production hosting/proxy configuration remains outside this milestone.
+The coordinator exposes health/state reads plus agent join, workstream claim, contract declaration, scope reassignment, ChangeSet submission, and local reset endpoints. The guided UI calls these endpoints through the Vite `/api` proxy. An MCP server (`uv run python -m server.mcp_server`, stdio) exposes the same six operations as tools, so any MCP-capable coding agent can join, declare, scope and submit through the coordinator. Deployment is described in [docs/DEPLOY.md](docs/DEPLOY.md).
 
 The stricter orchestration API lives under `/api`. It registers three codebase demo agents, requires a structured Intention Document before execution, blocks deterministic file/symbol/contract/dependency/permission conflicts, validates submitted ChangeSets against their approved intention, and records the workflow through the configured trace sink. See [the three-agent workflow](agents/README.md#three-agent-orchestration-demo).
 
-The checked-in [orchestration v1 contract](/Users/amanjeetsahagal/Documents/VTHACKS/VT-Hacks-14-Project/contracts/orchestration-api-v1.json) is frozen for frontend work. The verification suite rejects changes to its `/api` operations or response schemas. Additive API work belongs in a new versioned endpoint or a deliberate v2 contract update.
+The checked-in [orchestration v1 contract](contracts/orchestration-api-v1.json) is frozen for frontend work. The verification suite rejects changes to its `/api` operations or response schemas. Additive API work belongs in a new versioned endpoint or a deliberate v2 contract update.
 
 See [scope and team handoff](docs/SETUP.md) and [demo runbook](docs/DEMO.md). Keep secrets in ignored `.env`; never commit credentials, keys, or local database files.
