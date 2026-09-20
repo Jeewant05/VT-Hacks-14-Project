@@ -11,7 +11,7 @@
   "scripts": {
     "setup": "uv sync --locked && npm ci && npm run contracts && npm run seed",
     "dev": "concurrently --kill-others --names api,ui \"npm:dev:server\" \"npm:dev:ui\"",
-    "dev:server": "uv run uvicorn server.app.main:app --reload --host 127.0.0.1 --port 8000",
+    "dev:server": "uv run uvicorn server.app.main:app --reload --reload-dir server --reload-dir scripts --reload-dir agents --host 127.0.0.1 --port 8000",
     "dev:ui": "npm run dev --workspace ui",
     "contracts": "uv run python -m scripts.export_contracts && openapi-typescript contracts/openapi.json -o ui/src/api.generated.ts",
     "seed": "uv run python -m scripts.database seed",
