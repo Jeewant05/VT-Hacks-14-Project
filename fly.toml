@@ -30,6 +30,15 @@ primary_region = "iad"
   DATABASE_PATH = "/data/synapse.db"
   # The runner posts here while signing for the public origin above.
   LOCAL_BASE_URL = "http://127.0.0.1:8080"
+  # Transparency log that ANS registration returned badge URLs on.
+  ANS_TRUSTED_TL_HOSTS = "transparency.ans.godaddy.com,api.godaddy.com"
+
+  # Live coding agents run on Hugging Face's OpenAI-compatible router. Only the
+  # token is secret; provider and model selection are plain config.
+  BACKEND_PROVIDER = "huggingface"
+  FRONTEND_PROVIDER = "huggingface"
+  QA_PROVIDER = "huggingface"
+  HUGGINGFACE_MODEL = "openai/gpt-oss-120b:fastest"
 
 [http_service]
   internal_port = 8080

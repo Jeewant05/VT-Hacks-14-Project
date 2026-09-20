@@ -122,7 +122,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # demo secret. They stay mounted either way; /live/config reports what is
     # configured, which the dashboard needs before any run is possible.
     app.include_router(
-        build_live_router(runs, settings.gemini_model, build_demo_guard(settings.demo_token))
+        build_live_router(runs, build_demo_guard(settings.demo_token))
     )
 
     app.include_router(

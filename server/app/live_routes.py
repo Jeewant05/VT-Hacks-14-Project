@@ -17,7 +17,7 @@ class LiveRunResponse(BaseModel):
     status: str
 
 
-def build_live_router(runs: LiveRuns, model: str, guard=None) -> APIRouter:
+def build_live_router(runs: LiveRuns, guard=None) -> APIRouter:
     router = APIRouter(prefix="/api/live", tags=["live-agents"])
     # Only starting a run spends provider credit, so only that is gated.
     # Reading config or following an existing run stays open, or the

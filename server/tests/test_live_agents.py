@@ -135,7 +135,7 @@ def test_preview_escapes_agent_content_and_is_served_with_a_sandbox(tmp_path):
     run.preview_html = html
     runs.runs[run.run_id] = run
     app = FastAPI()
-    app.include_router(build_live_router(runs, "per-role"))
+    app.include_router(build_live_router(runs))
 
     response = TestClient(app).get("/api/live/runs/run-preview/preview")
     assert response.status_code == 200
