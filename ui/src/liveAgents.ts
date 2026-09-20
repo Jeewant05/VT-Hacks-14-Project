@@ -38,27 +38,10 @@ export async function getLiveConfig(): Promise<LiveConfig> {
   return json(await fetch('/api/live/config'));
 }
 
-/** Operator secret for billable endpoints, shared with the coordinator hooks. */
-function demoToken(): string | null {
-  try {
-    const held = sessionStorage.getItem('synapse-demo-token');
-    if (held) return held;
-    const entered = window.prompt('Demo token (set as DEMO_TOKEN on the server)');
-    if (entered) sessionStorage.setItem('synapse-demo-token', entered);
-    return entered;
-  } catch {
-    return null; // Blocked storage: let the server reject it instead.
-  }
-}
-
 export async function startLiveRun(objective: string): Promise<{ run_id: string; status: string }> {
-  // Starting a run spends provider credit, so the server requires the token.
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const token = demoToken();
-  if (token) headers['X-Demo-Token'] = token;
   return json(await fetch('/api/live/runs', {
     method: 'POST',
-    headers,
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ objective }),
   }));
 }

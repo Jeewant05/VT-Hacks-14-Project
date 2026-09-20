@@ -7,7 +7,6 @@ from server.app.acme import build_acme_router, parse_challenges
 from server.app.adapters import CacheMemory, IdentityAdapter, MemoryAdapter, MockIdentity
 from server.app.config import Settings
 from server.app.demo_runner import (
-    build_demo_guard,
     build_demo_router,
     require_demo_token_for_public,
 )
@@ -105,6 +104,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             live_integrations=settings.live_integrations,
             identity_tier="badge" if ans_identity else "none",
             dpop_required=bool(ans_identity and settings.ans_dpop_required),
+            reset_requires_token=bool(settings.demo_token),
         )
 
     @app.get("/api/state", response_model=WorkspaceState)
@@ -139,15 +139,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if source in configured
     }
     runs = LiveRuns(providers, settings.resolved_database_path.parent / "live-runs", trace)
-    # Live agents spend real provider credit, so the routes sit behind the shared
-    # demo secret. They stay mounted either way; /live/config reports what is
-    # configured, which the dashboard needs before any run is possible.
-    app.include_router(
-        build_live_router(runs, build_demo_guard(settings.demo_token))
-    )
+    # Open by design: a run costs provider credit but loses no data, and the
+    # dashboard must work without a prompt. Only /api/reset is behind DEMO_TOKEN.
+    # /live/config reports which providers are configured either way.
+    app.include_router(build_live_router(runs))
 
     app.include_router(
-        build_demo_router(settings, settings.demo_token, local_base=settings.local_base_url)
+        build_demo_router(settings, local_base=settings.local_base_url)
     )
     # ANS domain validation answers here instead of via DNS TXT records.
     challenges = parse_challenges(settings.acme_challenges)

@@ -685,6 +685,11 @@ export interface components {
              * @default false
              */
             dpop_required: boolean;
+            /**
+             * Reset Requires Token
+             * @default false
+             */
+            reset_requires_token: boolean;
         };
         /** IntentionContract */
         IntentionContract: {
@@ -1665,9 +1670,7 @@ export interface operations {
     start_api_live_runs_post: {
         parameters: {
             query?: never;
-            header?: {
-                "x-demo-token"?: string | null;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -1793,9 +1796,7 @@ export interface operations {
     run_api_demo_run_post: {
         parameters: {
             query?: never;
-            header?: {
-                "x-demo-token"?: string | null;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -1808,15 +1809,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DemoRunResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

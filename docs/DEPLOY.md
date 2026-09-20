@@ -28,7 +28,7 @@ with it. Nothing secret belongs here.
 | Secret | What it is |
 | --- | --- |
 | `ANS_API_KEY` / `ANS_API_SECRET` | GoDaddy ANS credentials. Stored split; composed into `key:secret` on use |
-| `DEMO_TOKEN` | Operator secret for `/api/reset`, `/api/demo/run` and starting live runs |
+| `DEMO_TOKEN` | Operator secret for `/api/reset` only. Everything else the dashboard does is open |
 | `ANS_AGENT_IDENTITIES` | JSON of base64 PEM cert+key per agent, for the server-side runner |
 | `HUGGINGFACE_API_KEY` | Hugging Face router token. The only HF secret needed; `HF_TOKEN` is accepted as a fallback alias |
 | `ACME_CHALLENGES` | HTTP-01 responses. Only needed while registering; safe to drop once every agent is ACTIVE |
@@ -37,8 +37,19 @@ with it. Nothing secret belongs here.
 
 `require_demo_token_for_public()` rejects a deployment whose
 `ANS_PUBLIC_BASE_URL` is a public host while `DEMO_TOKEN` is unset — `/api/reset`
-and `/api/demo/run` would be open to anyone who found the URL. The failure is at
-startup, before the first visitor, not at request time.
+would let anyone who found the URL wipe the workspace. The failure is at startup,
+before the first visitor, not at request time.
+
+## What is open, and the cost
+
+Only `/api/reset` needs the token, because it is the one endpoint that destroys
+state. Live runs and the demo runner are open so the dashboard works without a
+prompt. The cost of that is **provider credit, not data**: anyone who finds the
+URL can start a live run on `HUGGINGFACE_API_KEY`. Cap spend in the Hugging Face
+billing settings, and rotate the key if the URL travels further than intended.
+
+The demo runner never resets, so a second run replays over the finished
+workspace. Press Reset (which asks for the token) to start the scene fresh.
 
 ## Registering another agent or version
 
