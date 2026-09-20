@@ -232,23 +232,65 @@ Return JSON only, without markdown fences, using this exact shape:
 {{"report":"short implementation summary","files":[{{"path":"{role.allowed_root}/relative-name","content":"complete file contents"}}]}}
 Create a small, coherent implementation aligned with all three intentions. Do not include secrets,
 absolute paths, parent-directory traversal, or files outside your assigned directory.
+
+Hard limits -- a response outside them is rejected:
+- Return between 1 and {MAX_FILES_PER_AGENT} files. Merge related code into fewer files instead of splitting it.
+- Keep each file under {MAX_FILE_CHARS:,} characters.
 {preview_requirement}
 """
-        raw = await self.providers[role.id].generate(prompt)
-        proposal = self._json(raw)
-        if not isinstance(proposal.get("report"), str) or not isinstance(
-            proposal.get("files"), list
-        ):
+        provider = self.providers[role.id]
+        proposal, problem = self._read_proposal(await provider.generate(prompt))
+        if problem:
+            # One corrective retry. A single sloppy answer should not sink a whole
+            # three-agent run, and the model can fix a stated problem.
+            self.emit(role.id, "proposal_retry", f"{problem}; asking once more")
+            proposal, problem = self._read_proposal(await provider.generate(
+                f"{prompt}\nYour previous answer was rejected: {problem}.\n"
+                "Return the complete JSON again, within the limits."
+            ))
+        if problem or proposal is None:
+            raise ValueError(f"{role.id} {problem or 'returned no usable proposal'}")
+        if not isinstance(proposal.get("report"), str):
             raise TypeError(f"{role.id} response must contain report and files")
         self.emit(role.id, "proposal_received", proposal["report"][:1_000])
         return proposal
+
+    def _read_proposal(self, raw: str) -> tuple[dict[str, Any] | None, str | None]:
+        """Parse a build answer; return (proposal, None) or (None, what is wrong).
+
+        The wording is written for the model to read on the retry, so it says what
+        was received and what is allowed rather than only that something failed.
+        """
+        try:
+            proposal = self._json(raw)
+        except (ValueError, TypeError):
+            return None, "returned something that was not a single JSON object"
+        files = proposal.get("files")
+        if not isinstance(files, list) or not isinstance(proposal.get("report"), str):
+            return None, 'must return JSON with a "report" string and a "files" list'
+        if not files:
+            return None, f"returned no files; it must return 1-{MAX_FILES_PER_AGENT}"
+        if len(files) > MAX_FILES_PER_AGENT:
+            return None, (
+                f"returned {len(files)} files; it must return 1-{MAX_FILES_PER_AGENT}. "
+                "Merge related code into fewer files"
+            )
+        oversized = [
+            str(f.get("path")) for f in files
+            if isinstance(f, dict) and len(str(f.get("content", ""))) > MAX_FILE_CHARS
+        ]
+        if oversized:
+            return None, f"{oversized[0]} exceeds the {MAX_FILE_CHARS:,}-character per-file limit"
+        return proposal, None
 
     def _stage(
         self, role: AgentRole, proposal: dict[str, Any], existing: list[Artifact]
     ) -> list[Artifact]:
         files = proposal["files"]
         if not files or len(files) > MAX_FILES_PER_AGENT:
-            raise ValueError(f"{role.id} must return 1-{MAX_FILES_PER_AGENT} files")
+            raise ValueError(
+                f"{role.id} returned {len(files)} files; it must return 1-{MAX_FILES_PER_AGENT}"
+            )
         pending: list[Artifact] = []
         for value in files:
             if not isinstance(value, dict):
