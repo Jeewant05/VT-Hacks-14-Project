@@ -49,3 +49,18 @@ def test_live_config_exposes_three_huggingface_agents(tmp_path):
         "model/frontend:fastest",
         "model/integration:fastest",
     ]
+
+
+def test_huggingface_api_key_is_the_primary_name():
+    """HUGGINGFACE_API_KEY is the documented variable; HF_TOKEN is only a fallback."""
+    provider = build_provider("huggingface", Settings(huggingface_api_key="hf-primary"), "backend")
+    assert provider.api_key == "hf-primary"
+
+    both = Settings(huggingface_api_key="hf-primary", hf_token="hf-fallback")
+    assert build_provider("huggingface", both, "backend").api_key == "hf-primary"
+
+
+def test_huggingface_defaults_to_a_model_the_router_serves():
+    """No HUGGINGFACE_MODEL needed: the default is the model production pins."""
+    provider = build_provider("huggingface", Settings(huggingface_api_key="k"), "backend")
+    assert provider.model == "openai/gpt-oss-120b:fastest"

@@ -21,7 +21,7 @@ with it. Nothing secret belongs here.
 | `DATABASE_PATH` | `/data/synapse.db` | On the volume, so it survives a redeploy |
 | `LOCAL_BASE_URL` | `http://127.0.0.1:8080` | Where the runner posts while signing for the public origin |
 | `BACKEND_PROVIDER` / `FRONTEND_PROVIDER` / `QA_PROVIDER` | `huggingface` | |
-| `HUGGINGFACE_MODEL` | `openai/gpt-oss-120b:fastest` | Per-role overrides exist but are unset |
+| `HUGGINGFACE_MODEL` | `openai/gpt-oss-120b:fastest` | Optional: equals the code default, pinned here so a change to the default cannot silently change production. Per-role overrides exist but are unset |
 
 **Fly secrets** — `fly secrets set`, or the dashboard's batch import.
 
@@ -30,7 +30,7 @@ with it. Nothing secret belongs here.
 | `ANS_API_KEY` / `ANS_API_SECRET` | GoDaddy ANS credentials. Stored split; composed into `key:secret` on use |
 | `DEMO_TOKEN` | Operator secret for `/api/reset`, `/api/demo/run` and starting live runs |
 | `ANS_AGENT_IDENTITIES` | JSON of base64 PEM cert+key per agent, for the server-side runner |
-| `HF_TOKEN` | Hugging Face router token |
+| `HUGGINGFACE_API_KEY` | Hugging Face router token. The only HF secret needed; `HF_TOKEN` is accepted as a fallback alias |
 | `ACME_CHALLENGES` | HTTP-01 responses. Only needed while registering; safe to drop once every agent is ACTIVE |
 
 ## The app refuses to start misconfigured
