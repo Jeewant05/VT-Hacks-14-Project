@@ -8,6 +8,19 @@ type Props = { onSimulation: () => void };
 const initialObjective = 'Build a small task manager with a FastAPI backend, React frontend, and contract tests.';
 const roleIds = ['backend', 'frontend', 'integration'] as const;
 
+/** Provider errors arrive as `vendor 402: {"error":"..."}`; show just the sentence. */
+function readableDetail(raw: string): string {
+  const brace = raw.indexOf('{');
+  if (brace >= 0) {
+    try {
+      const parsed = JSON.parse(raw.slice(brace)) as { error?: string | { message?: string }; message?: string };
+      const inner = typeof parsed.error === 'string' ? parsed.error : parsed.error?.message ?? parsed.message;
+      if (inner) return inner;
+    } catch { /* not JSON: fall through to the raw text */ }
+  }
+  return raw.length > 240 ? `${raw.slice(0, 240)}…` : raw;
+}
+
 export function LiveDashboard({ onSimulation }: Props) {
   const [objective, setObjective] = useState(initialObjective);
   const [config, setConfig] = useState<LiveConfig | null>(null);
@@ -75,14 +88,19 @@ export function LiveDashboard({ onSimulation }: Props) {
       if (tab && !tab.closed) tab.location.replace(snapshot.preview_url);
       setPreviewNotice(tab ? 'Finished app opened in the preview tab.' : 'Finished app is ready to open.');
     } else if (snapshot.status === 'failed') {
+      // Say what actually failed. A provider rejecting the request (out of credits,
+      // bad key) is not a validation failure, and reporting it as one sends people
+      // to debug generated code when nothing was ever generated.
+      const title = snapshot.failure_title ?? 'The agent build failed validation.';
+      const detail = snapshot.error ? readableDetail(snapshot.error) : '';
       if (tab && !tab.closed) {
         tab.document.title = 'Agent build failed';
         const heading = tab.document.querySelector('h1');
         const copy = tab.document.querySelector('div > p:last-child');
-        if (heading) heading.textContent = 'The build did not pass validation.';
-        if (copy) copy.textContent = 'Return to the Synapse dashboard to inspect the coordinator timeline.';
+        if (heading) heading.textContent = title;
+        if (copy) copy.textContent = detail || 'Return to the Synapse dashboard to inspect the coordinator timeline.';
       }
-      setPreviewNotice('The preview was not published because the agent build failed validation.');
+      setPreviewNotice(detail ? `${title} ${detail}` : title);
     }
   }
 

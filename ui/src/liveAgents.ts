@@ -15,6 +15,9 @@ export type LiveSnapshot = {
   intentions: Record<string, string>;
   reports: Record<string, string>;
   preview_url: string | null;
+  // Why a failed run failed, from the server; null while running or on success.
+  error?: string | null;
+  failure_title?: string | null;
 };
 export type LiveConfig = {
   configured: boolean;

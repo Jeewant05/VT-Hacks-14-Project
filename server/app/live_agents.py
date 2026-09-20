@@ -52,6 +52,27 @@ MAX_FILE_CHARS = 50_000
 MAX_TOTAL_CHARS = 180_000
 
 
+def explain_failure(message: str) -> str:
+    """One-line headline for a failed run, from the error the run recorded.
+
+    A provider rejecting the request is not a validation failure -- no code was
+    ever generated to validate -- and calling it one misdirects the operator.
+    """
+    text = message.lower()
+    provider = message.split(" ", 1)[0] if message[:1].isalpha() else "The provider"
+    if " 402" in text or "depleted" in text or "credits" in text or "payment required" in text:
+        return f"{provider} rejected the request: the account is out of credits."
+    if " 401" in text or " 403" in text or "unauthorized" in text or "invalid api key" in text:
+        return f"{provider} rejected the API key."
+    if " 429" in text or "rate limit" in text:
+        return f"{provider} is rate limiting requests. Try again shortly."
+    if "is not set" in text or "not configured" in text:
+        return "A live-agent provider key is not configured."
+    if any(word in text for word in ("timeout", "timed out", "connection")):
+        return f"{provider} could not be reached."
+    return "The agent build failed validation."
+
+
 @dataclass
 class Artifact:
     path: str
@@ -75,6 +96,7 @@ class LiveRun:
     reports: dict[str, str] = field(default_factory=dict)
     preview_html: str | None = None
     status: str = "queued"
+    error: str | None = None
     task: asyncio.Task[None] | None = None
 
     def emit(self, agent: str, event_type: str, message: str, **extra: Any) -> None:
@@ -115,6 +137,9 @@ class LiveRun:
             "preview_url": (
                 f"/api/live/runs/{self.run_id}/preview" if self.preview_html else None
             ),
+            # Why a failed run failed, so the dashboard need not guess.
+            "error": self.error,
+            "failure_title": explain_failure(self.error) if self.error else None,
         }
 
     async def execute(self) -> None:
@@ -152,7 +177,8 @@ class LiveRun:
             self._commit(contract, staged)
         except Exception as exc:  # noqa: BLE001 - failures belong in the live timeline
             self.status = "failed"
-            self.emit("coordinator", "run_failed", str(exc)[:1_000])
+            self.error = str(exc)[:1_000]
+            self.emit("coordinator", "run_failed", self.error)
             return
 
         self.status = "complete"
