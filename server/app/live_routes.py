@@ -73,9 +73,12 @@ def build_live_router(runs: LiveRuns) -> APIRouter:
             headers={
                 "Cache-Control": "no-store",
                 "Content-Security-Policy": (
-                    "sandbox; default-src 'none'; style-src 'unsafe-inline'; "
-                    "img-src data:; base-uri 'none'; form-action 'none'"
+                    "sandbox allow-scripts; default-src 'none'; "
+                    "script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
+                    "img-src data: blob:; media-src data: blob:; font-src data:; "
+                    "connect-src 'none'; worker-src blob:; base-uri 'none'; form-action 'none'"
                 ),
+                "Referrer-Policy": "no-referrer",
                 "X-Content-Type-Options": "nosniff",
             },
         )

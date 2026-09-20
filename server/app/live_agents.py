@@ -227,9 +227,15 @@ Do not write code yet. Your intention will be shared with the other two agents.
         preview_requirement = ""
         if role.id == "frontend":
             preview_requirement = f"""
-You MUST include `{PREVIEW_PATH}` in files. Its content must be a valid JSON string with this shape:
-{{"title":"app name","subtitle":"what the finished app does","accent":"#6d5dfc","primary_action":"button label","metrics":[{{"value":"8","label":"Total items"}}],"cards":[{{"title":"feature or item","description":"useful detail","badge":"status"}}]}}
-Use 2-4 metrics and 3-6 cards. This structured file drives the safe finished-application preview.
+You MUST include `{PREVIEW_PATH}` in files. It is the finished application shown to the user,
+not a mockup or a description. Return a complete standalone HTML document with inline CSS and
+inline vanilla JavaScript. It must visibly respond to mouse/touch and keyboard input and implement
+the objective itself. For a game, include clear controls, start/reset behavior, scoring, and a real
+play loop using Canvas or the DOM. For another kind of app, make its primary workflow usable.
+
+The preview runs in an isolated browser sandbox with no network access. Do not use imports,
+frameworks, CDNs, fetch, XMLHttpRequest, WebSocket, external URLs, iframes, forms, or assets that
+are not data URLs. Make it responsive and accessible, and ensure it works by opening this one file.
 """
         prompt = f"""You are the {role.title} in a coordinated coding demo.
 Objective: {self.objective}

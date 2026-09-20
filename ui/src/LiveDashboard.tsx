@@ -21,6 +21,7 @@ export function LiveDashboard({ onHub, repositoryMode = false }: { onHub?: (hasR
   const [repositoryQuery, setRepositoryQuery] = useState('');
   const [repositoryBranch, setRepositoryBranch] = useState('main');
   const [copied, setCopied] = useState(false);
+  const [previewStatus, setPreviewStatus] = useState('');
   const sourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
@@ -64,6 +65,8 @@ export function LiveDashboard({ onHub, repositoryMode = false }: { onHub?: (hasR
 
   async function start() {
     if (!objective.trim()) { setError('Describe the change you want the team to make.'); return; }
+    const previewTab = openWaitingTab(objective);
+    setPreviewStatus(previewTab ? 'Interactive app tab opened; it will update when the agents finish.' : 'Popups are blocked. You can open the app here when the agents finish.');
     setBusy(true); setError(''); setEvents([]); setTraces([]); setRun(null); setSelectedPath('shared/api-contract.json');
     sourceRef.current?.close();
     try {
@@ -72,22 +75,43 @@ export function LiveDashboard({ onHub, repositoryMode = false }: { onHub?: (hasR
       const source = subscribeLiveRun(result.run_id, event => {
         setEvents(current => [...current, event]);
         void refresh(result.run_id).catch(() => undefined);
-        if (event.event_type === 'run_complete' || event.event_type === 'run_failed') {
+        if (event.event_type === 'run_complete') {
           source.close();
+          void refresh(result.run_id).then(snapshot => {
+            if (!snapshot.preview_url) return;
+            if (previewTab && !previewTab.closed) {
+              previewTab.location.replace(snapshot.preview_url);
+              setPreviewStatus('Interactive app is ready in its tab.');
+            } else {
+              setPreviewStatus('Interactive app is ready. Open it below.');
+            }
+          }).catch(() => setPreviewStatus('The run finished, but the preview could not be opened automatically.'));
+        }
+        if (event.event_type === 'run_failed') {
+          source.close();
+          showTabFailure(previewTab, event.message);
+          setPreviewStatus('The agents did not produce a valid interactive app.');
         }
       });
       source.onerror = () => {
         source.close();
-        void refresh(result.run_id).catch(() => undefined);
+        void refresh(result.run_id).then(snapshot => {
+          if (snapshot.status === 'complete' && snapshot.preview_url && previewTab && !previewTab.closed) {
+            previewTab.location.replace(snapshot.preview_url);
+            setPreviewStatus('Interactive app is ready in its tab.');
+          }
+        }).catch(() => undefined);
       };
       sourceRef.current = source;
     } catch (cause) {
+      previewTab?.close();
       setError(cause instanceof Error ? cause.message : 'Could not start the coding agents.');
     } finally { setBusy(false); }
   }
 
   function reset() {
     sourceRef.current?.close(); setRun(null); setEvents([]); setTraces([]); setError('');
+    setPreviewStatus('');
     setSelectedPath('shared/api-contract.json');
   }
 
@@ -106,7 +130,7 @@ export function LiveDashboard({ onHub, repositoryMode = false }: { onHub?: (hasR
     {!repositoryMode && <section className="prompt-card">
       <div className="prompt-heading"><div><label htmlFor="objective">Project objective</label><small>{config ? `3 role providers · ${config.configured ? 'ready' : 'setup required'}` : 'Checking configuration…'}</small></div>{run && <span className={`run-status status-${run.status}`}>{run.status}</span>}</div>
       <textarea id="objective" value={objective} placeholder="Describe the change this team should implement…" maxLength={2000} onChange={event => setObjective(event.target.value)} disabled={busy || !!run} />
-      <div className="prompt-actions"><button className="primary" onClick={start} disabled={busy || !!run || !config?.configured || !objective.trim()}>{busy ? 'Starting…' : 'Run coordinated change'}</button>{run && <button className="secondary" onClick={reset} disabled={run.status === 'planning' || run.status === 'building'}>New run</button>}<span>{run?.git_repository ? `Git workspace: ${run.workspace}` : 'Choose an objective to create a Git-backed workspace.'}</span></div>
+      <div className="prompt-actions"><button className="primary" onClick={start} disabled={busy || !!run || !config?.configured || !objective.trim()}>{busy ? 'Starting…' : 'Run coordinated change'}</button>{run && <button className="secondary" onClick={reset} disabled={run.status === 'planning' || run.status === 'building'}>New run</button>}{run?.preview_url && <button className="secondary" onClick={() => openFinishedApp(run.preview_url!)}>Open interactive app <ExternalLink size={14} /></button>}<span>{previewStatus || (run?.git_repository ? `Git workspace: ${run.workspace}` : 'Choose an objective to create a Git-backed workspace.')}</span></div>
       {config && !config.configured && <div className="setup-note"><strong>Three agent APIs needed.</strong> Set <code>BACKEND_PROVIDER</code>, <code>FRONTEND_PROVIDER</code>, and <code>QA_PROVIDER</code>, plus the matching API keys in <code>.env</code>, then restart the API.</div>}
     </section>}
 
@@ -127,6 +151,41 @@ export function LiveDashboard({ onHub, repositoryMode = false }: { onHub?: (hasR
       {!repositoryMode && <div className="panel activity-panel-live"><RepositoryActivity traces={traces} waiting={Boolean(run)} /></div>}
     </section>
   </div>;
+}
+
+function openWaitingTab(objective: string) {
+  const tab = window.open('', '_blank');
+  if (!tab) return null;
+  tab.document.title = 'Synapse · Building your app';
+  const style = tab.document.createElement('style');
+  style.textContent = 'body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0d1511;color:#eef7f1;font-family:Inter,system-ui,sans-serif}.card{width:min(560px,calc(100% - 48px));padding:38px;border:1px solid #294237;border-radius:22px;background:#14211b;box-shadow:0 24px 80px #0008}.pulse{width:12px;height:12px;border-radius:50%;background:#67e8a6;box-shadow:0 0 0 0 #67e8a688;animation:p 1.5s infinite}@keyframes p{70%{box-shadow:0 0 0 14px #67e8a600}}h1{font-size:30px;margin:20px 0 10px}p{color:#a9bcb1;line-height:1.6}small{display:block;margin-top:22px;color:#6f8b7c}';
+  tab.document.head.append(style);
+  const card = tab.document.createElement('main');
+  card.className = 'card';
+  const pulse = tab.document.createElement('div');
+  pulse.className = 'pulse';
+  const heading = tab.document.createElement('h1');
+  heading.textContent = 'Three agents are building your app';
+  const detail = tab.document.createElement('p');
+  detail.textContent = objective;
+  const note = tab.document.createElement('small');
+  note.textContent = 'This tab will switch to the finished interactive application automatically.';
+  card.append(pulse, heading, detail, note);
+  tab.document.body.replaceChildren(card);
+  return tab;
+}
+
+function showTabFailure(tab: Window | null, message: string) {
+  if (!tab || tab.closed) return;
+  tab.document.title = 'Synapse · Build failed';
+  const heading = tab.document.querySelector('h1');
+  const detail = tab.document.querySelector('p');
+  if (heading) heading.textContent = 'The app could not be built';
+  if (detail) detail.textContent = message;
+}
+
+function openFinishedApp(previewUrl: string) {
+  window.open(previewUrl, '_blank', 'noopener,noreferrer');
 }
 
 function RepositoryActivity({ traces, waiting = false }: { traces: LiveTrace[]; waiting?: boolean }) {

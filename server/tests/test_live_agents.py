@@ -12,6 +12,12 @@ from server.app.live_routes import build_live_router
 from server.app.main import create_app
 from server.app.tracing import CacheTraceSink
 
+INTERACTIVE_PREVIEW = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Task Flow</title></head>
+<body><button id="add">Add task</button><output id="count">0</output>
+<script>let count=0;add.onclick=()=>{count+=1;document.querySelector('#count').value=count}</script>
+</body></html>"""
+
 
 class FakeProvider:
     def __init__(self, role: str, invalid_path: bool = False):
@@ -36,19 +42,8 @@ class FakeProvider:
                         "content": "export function App() { return null }\n",
                     },
                     {
-                        "path": "frontend/preview.json",
-                        "content": json.dumps({
-                            "title": "Task Flow",
-                            "subtitle": "A focused task manager built by the agent team.",
-                            "accent": "#6d5dfc",
-                            "primary_action": "Add task",
-                            "metrics": [{"value": "3", "label": "Open tasks"}],
-                            "cards": [{
-                                "title": "Ship demo",
-                                "description": "Validate the finished preview.",
-                                "badge": "In progress",
-                            }],
-                        }),
+                        "path": "frontend/preview.html",
+                        "content": INTERACTIVE_PREVIEW,
                     },
                 ],
             },
@@ -80,13 +75,8 @@ class MalformedProposalThenValidProvider(FakeProvider):
             "files": [
                 {"path": "frontend/App.tsx", "content": "export function App() { return null }\n"},
                 {
-                    "path": "frontend/preview.json",
-                    "content": json.dumps({
-                        "title": "Task Flow", "subtitle": "Tasks stay in sync.",
-                        "accent": "#6d5dfc", "primary_action": "Add task",
-                        "metrics": [],
-                        "cards": [{"title": "First task", "description": "Ready to ship.", "badge": "Open"}],
-                    }),
+                    "path": "frontend/preview.html",
+                    "content": INTERACTIVE_PREVIEW,
                 },
             ],
         })
@@ -126,7 +116,7 @@ def test_three_apis_plan_then_generate_scoped_project(tmp_path):
     }
     assert (run.root / "backend/app.py").exists()
     assert (run.root / "frontend/App.tsx").exists()
-    assert (run.root / "frontend/preview.json").exists()
+    assert (run.root / "frontend/preview.html").exists()
     assert (run.root / "integration/README.md").exists()
     assert run.preview_html is not None
     assert "Task Flow" in run.preview_html
@@ -202,20 +192,12 @@ def test_legacy_workspace_can_be_recovered_for_dashboard(tmp_path):
     assert recovered.artifacts[0].agent_id == "backend"
 
 
-def test_preview_escapes_agent_content_and_is_served_with_a_sandbox(tmp_path):
-    spec = {
-        "title": "<script>alert('no')</script>",
-        "subtitle": "A safe generated app.",
-        "accent": "#123456",
-        "primary_action": "Launch",
-        "metrics": [],
-        "cards": [{"title": "Card", "description": "Details", "badge": "Ready"}],
-    }
+def test_interactive_preview_is_served_in_an_opaque_networkless_sandbox(tmp_path):
     html = render_agent_preview(
-        "Build safely", [Artifact("frontend/preview.json", "frontend", json.dumps(spec))]
+        "Build an interactive task list",
+        [Artifact("frontend/preview.html", "frontend", INTERACTIVE_PREVIEW)],
     )
-    assert "<script>alert" not in html
-    assert "&lt;script&gt;alert" in html
+    assert "add.onclick" in html
 
     runs = LiveRuns({}, tmp_path, None)  # type: ignore[arg-type]
     run = LiveRun("run-preview", "Build safely", tmp_path / "run-preview", {})
@@ -227,8 +209,26 @@ def test_preview_escapes_agent_content_and_is_served_with_a_sandbox(tmp_path):
 
     response = TestClient(app).get("/api/live/runs/run-preview/preview")
     assert response.status_code == 200
-    assert response.headers["content-security-policy"].startswith("sandbox;")
+    policy = response.headers["content-security-policy"]
+    assert policy.startswith("sandbox allow-scripts;")
+    assert "allow-same-origin" not in policy
+    assert "script-src 'unsafe-inline'" in policy
+    assert "connect-src 'none'" in policy
+    assert response.headers["referrer-policy"] == "no-referrer"
     assert response.headers["x-content-type-options"] == "nosniff"
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "<html><body>No script</body></html>",
+        "<html><body><iframe srcdoc='bad'></iframe><script>void 0</script></body></html>",
+        "<html><body><script>void 0</script><meta http-equiv='refresh' content='0'></body></html>",
+    ],
+)
+def test_preview_rejects_noninteractive_or_embedded_documents(content):
+    with pytest.raises(ValueError):
+        render_agent_preview("Build safely", [Artifact("frontend/preview.html", "frontend", content)])
 
 
 def test_live_config_reports_each_missing_api(tmp_path):

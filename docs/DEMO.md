@@ -9,7 +9,7 @@
 5. A waiting application tab opens immediately. The integration agent reviews the staged output; after validation, all files are committed to the run sandbox together.
 6. The waiting tab automatically switches to the finished application preview. If popups are blocked, use **Open finished app** in the dashboard.
 
-Be precise in the presentation: the displayed files and `frontend/preview.json` are genuinely returned through Hugging Face Inference Providers and written to an isolated local run directory. Synapse validates boundaries and renders that structured preview through a constrained, non-executable application shell; it does not execute arbitrary generated code or create a Git commit. Use the guided simulation when a token or network connection is unavailable.
+Be precise in the presentation: the displayed files and `frontend/preview.html` are genuinely returned through Hugging Face Inference Providers, written to an isolated local run directory, and committed to that run's Git repository. Synapse validates boundaries and serves the generated app in an opaque-origin browser sandbox. Inline JavaScript is allowed so games and workflows are interactive, while network access, parent-page access, external assets, navigation, and form submission remain blocked. Use the guided simulation when a token or network connection is unavailable.
 
 ## Foundation smoke check (available now)
 
@@ -33,7 +33,7 @@ The pasted deadline is provisional: confirm this year's submission time and vide
 
 Set in `.env`: `BACKEND_PROVIDER=huggingface`, `FRONTEND_PROVIDER=huggingface`, `QA_PROVIDER=huggingface`, and `HF_TOKEN`. The shared model defaults to `openai/gpt-oss-120b:fastest`; role-specific model overrides are optional. Restart `npm run dev:server`.
 
-In the dashboard start the three coding agents. They publish intentions first, backend and frontend build in parallel, integration reviews the staged files, and the coordinator commits the validated run artifacts. The frontend agent also generates a structured preview that opens in the waiting tab after validation. Each card shows its actual provider and model.
+In the dashboard start the three coding agents. They publish intentions first, backend and frontend build in parallel, integration reviews the staged files, and the coordinator commits the validated run artifacts. The frontend agent also generates a standalone interactive application that opens in the waiting tab after validation. Each card shows its actual provider and model.
 
 From a terminal: `curl -s -X POST localhost:8000/api/live/runs -H 'Content-Type: application/json' -d '{"objective":"Add organization OAuth login"}'` then `curl -s -N localhost:8000/api/live/runs/<run_id>/events`.
 
