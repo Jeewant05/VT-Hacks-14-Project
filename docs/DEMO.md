@@ -35,7 +35,7 @@ Set in `.env`: `BACKEND_PROVIDER=huggingface`, `FRONTEND_PROVIDER=huggingface`, 
 
 In the dashboard start the three coding agents. They publish intentions first, backend and frontend build in parallel, integration reviews the staged files, and the coordinator commits the validated run artifacts. The frontend agent also generates a structured preview that opens in the waiting tab after validation. Each card shows its actual provider and model.
 
-From a terminal: `curl -s -X POST localhost:8000/api/live/runs -H 'Content-Type: application/json' -d '{"objective":"Add organization OAuth login"}'` then `curl -s -N localhost:8000/api/live/runs/<run_id>/events`. Open `localhost:8000/api/live/runs/<run_id>/preview` after completion.
+From a terminal: `curl -s -X POST localhost:8000/api/live/runs -H 'Content-Type: application/json' -d '{"objective":"Add organization OAuth login"}'` then `curl -s -N localhost:8000/api/live/runs/<run_id>/events`.
 
 ## Coordinator scene from a terminal
 

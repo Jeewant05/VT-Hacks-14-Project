@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Three-agent demo scene against a running API (npm run dev:server). Fail-safe level 2.
-# Usage: bash scripts/scenario.sh [base_url]
+# Three-agent demo scene against a running API (npm run dev:server). Fail-safe level 4.
+# Usage: bash scripts/scenario.sh [base_url]   (base_url must include /api)
 set -euo pipefail
-B="${1:-http://127.0.0.1:8000}"
+B="${1:-http://127.0.0.1:8000/api}"
 J='Content-Type: application/json'
 step() { echo; echo "== $1"; }
 post() { curl -sS -X POST "$B$1" -H "$J" ${2:+-d "$2"} | python3 -c "
