@@ -1,6 +1,7 @@
 import asyncio
 import json
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -383,3 +384,74 @@ def test_an_empty_answer_is_reported_as_empty_not_as_a_bad_count(tmp_path):
     asyncio.run(run.execute())
     assert run.status == "failed"
     assert "returned no files" in run.snapshot()["error"]
+
+
+# --- Provider overload: retried, then explained -------------------------------
+
+
+def test_an_overload_is_named_as_such_not_as_a_validation_failure():
+    from server.app.live_agents import explain_failure
+
+    spike = 'gemini 503: {"error":{"message":"This model is currently experiencing high demand."}}'
+    assert explain_failure(spike) == "gemini is temporarily overloaded. Try again shortly."
+    assert "overloaded" in explain_failure("huggingface 502: bad gateway")
+    # A genuine validation error must not be mistaken for an overload.
+    assert explain_failure("backend returned 9 files; it must return 1-6") == (
+        "The agent build failed validation."
+    )
+
+
+# --- Tolerant parsing of model answers ---------------------------------------
+
+
+def parse(raw: str):
+    return LiveRun._json(raw)
+
+
+def test_a_raw_newline_inside_a_string_is_accepted():
+    """The failure seen on the live site: `Invalid control character at line 18`.
+
+    A model puts a whole markdown file inside a JSON string and leaves some real
+    line breaks in it. The content is right and only the escaping is off.
+    """
+    raw = '{"report": "ok", "files": [{"path": "integration/README.md", "content": "# Title\nbody\n\ttabbed"}]}'
+    assert parse(raw)["files"][0]["content"] == "# Title\nbody\n\ttabbed"
+
+
+def test_json_wrapped_in_prose_or_fences_is_still_read():
+    body = '{"report": "ok", "files": []}'
+    assert parse(f"Here is the result:\n{body}\nHope that helps.") == {"report": "ok", "files": []}
+    assert parse(f"```json\n{body}\n```") == {"report": "ok", "files": []}
+
+
+def test_genuinely_malformed_json_still_fails():
+    for raw in ['{"report": "ok", "files": [', "no json here at all", '{"report": ok}']:
+        with pytest.raises(ValueError):
+            parse(raw)
+    with pytest.raises(TypeError):
+        parse("[1, 2, 3]")
+
+
+def test_the_retry_tells_the_model_where_its_json_broke(tmp_path):
+    """Naming the error location lets the second answer fix it instead of guess."""
+
+    class BrokenThenFine(FakeProvider):
+        def __init__(self, role):
+            super().__init__(role)
+            self.build_calls = 0
+
+        async def generate(self, prompt: str) -> str:
+            if "Do not write code yet" in prompt:
+                return await super().generate(prompt)
+            self.build_calls += 1
+            if self.build_calls == 1:
+                return '{"report": "ok", "files": [{"path": "backend/a.py", "content": "x"'
+            return await super().generate(prompt)
+
+    backend = BrokenThenFine("backend")
+    run = LiveRun("run-json", "Build tasks", tmp_path / "run-json", swap_backend(backend))
+    asyncio.run(run.execute())
+
+    assert run.status == "complete"
+    retry = next(e for e in run.events if e["event_type"] == "proposal_retry")
+    assert "was not valid JSON" in retry["message"] and "line" in retry["message"]

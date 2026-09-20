@@ -26,6 +26,33 @@ class Provider(Protocol):
     async def generate(self, prompt: str) -> str: ...
 
 
+RETRY_ATTEMPTS = 4
+RETRY_MAX_DELAY = 8.0
+
+
+async def post_with_retry(
+    client: httpx.AsyncClient, url: str, *, headers: dict[str, str], payload: dict[str, Any]
+) -> httpx.Response:
+    """POST, retrying the failures that are the provider's load rather than our request.
+
+    429 and 5xx clear on their own -- Gemini's "high demand" 503 lasts seconds --
+    while any other 4xx means the request itself is wrong and retrying only spends
+    quota. Honours Retry-After, otherwise backs off 1s, 2s, 4s.
+    """
+    response: httpx.Response | None = None
+    for attempt in range(RETRY_ATTEMPTS):
+        response = await client.post(url, headers=headers, json=payload)
+        if response.status_code != 429 and response.status_code < 500:
+            return response
+        if attempt < RETRY_ATTEMPTS - 1:
+            retry_after = response.headers.get("retry-after", "")
+            delay = float(retry_after) if retry_after.replace(".", "", 1).isdigit() else 2**attempt
+            await asyncio.sleep(min(delay, RETRY_MAX_DELAY))
+    if response is None:  # RETRY_ATTEMPTS is positive, so this is unreachable
+        raise ProviderError("provider request was never sent")
+    return response
+
+
 class GeminiProvider:
     name = "gemini"
 
@@ -41,8 +68,8 @@ class GeminiProvider:
             "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"},
         }
         async with httpx.AsyncClient(timeout=90) as client:
-            response = await client.post(
-                url, headers={"x-goog-api-key": self.api_key}, json=payload
+            response = await post_with_retry(
+                client, url, headers={"x-goog-api-key": self.api_key}, payload=payload
             )
         if response.is_error:
             raise ProviderError(f"gemini {response.status_code}: {response.text[:300]}")
@@ -70,21 +97,8 @@ class OpenAICompatibleProvider:
             "temperature": 0.2,
         }
         headers = {"Authorization": f"Bearer {self.api_key}"}
-        response = None
         async with httpx.AsyncClient(timeout=90) as client:
-            for attempt in range(3):
-                response = await client.post(url, headers=headers, json=payload)
-                if response.status_code != 429 and response.status_code < 500:
-                    break
-                if attempt < 2:
-                    retry_after = response.headers.get("retry-after", "")
-                    delay = (
-                        float(retry_after)
-                        if retry_after.replace(".", "", 1).isdigit()
-                        else 2**attempt
-                    )
-                    await asyncio.sleep(min(delay, 8))
-        assert response is not None
+            response = await post_with_retry(client, url, headers=headers, payload=payload)
         if response.is_error:
             raise ProviderError(f"{self.name} {response.status_code}: {response.text[:300]}")
         data = response.json()

@@ -33,12 +33,14 @@ primary_region = "iad"
   # Transparency log that ANS registration returned badge URLs on.
   ANS_TRUSTED_TL_HOSTS = "transparency.ans.godaddy.com,api.godaddy.com"
 
-  # Live coding agents run on Hugging Face's OpenAI-compatible router. Only the
-  # token is secret; provider and model selection are plain config.
-  BACKEND_PROVIDER = "huggingface"
-  FRONTEND_PROVIDER = "huggingface"
-  QA_PROVIDER = "huggingface"
-  HUGGINGFACE_MODEL = "openai/gpt-oss-120b:fastest"
+  # Live coding agents run on Gemini, one API key per role
+  # (GEMINI_API_KEY_BACKEND / _FRONTEND / _QA, all Fly secrets) so the three
+  # concurrent agents do not share one rate limit. Provider and model selection
+  # are plain config; only the keys are secret.
+  BACKEND_PROVIDER = "gemini"
+  FRONTEND_PROVIDER = "gemini"
+  QA_PROVIDER = "gemini"
+  GEMINI_MODEL = "gemini-3.6-flash"
 
 [http_service]
   internal_port = 8080

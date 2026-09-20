@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -66,6 +67,8 @@ def explain_failure(message: str) -> str:
         return f"{provider} rejected the API key."
     if " 429" in text or "rate limit" in text:
         return f"{provider} is rate limiting requests. Try again shortly."
+    if re.search(r" 5\d\d\b", text) or "unavailable" in text or "high demand" in text:
+        return f"{provider} is temporarily overloaded. Try again shortly."
     if "is not set" in text or "not configured" in text:
         return "A live-agent provider key is not configured."
     if any(word in text for word in ("timeout", "timed out", "connection")):
@@ -263,11 +266,13 @@ Hard limits -- a response outside them is rejected:
         """
         try:
             proposal = self._json(raw)
-        except (ValueError, TypeError):
+        except json.JSONDecodeError as exc:
             return None, (
-                "returned malformed JSON; escape newlines, quotes, and backslashes inside every "
-                "file content string and return one JSON object only"
+                f"returned malformed JSON ({exc.msg} at line {exc.lineno} column {exc.colno}); "
+                "escape newlines, quotes, and backslashes inside every file content string"
             )
+        except TypeError:
+            return None, "returned something that was not a single JSON object"
         files = proposal.get("files")
         if not isinstance(files, list) or not isinstance(proposal.get("report"), str):
             return None, 'must return JSON with a "report" string and a "files" list'
@@ -366,10 +371,24 @@ Hard limits -- a response outside them is rejected:
 
     @staticmethod
     def _json(raw: str) -> dict[str, Any]:
+        """Parse a model's answer into a JSON object, tolerating common slips.
+
+        Models embed whole source files as JSON strings and routinely leave a raw
+        newline or tab inside one, which the strict parser rejects as "Invalid
+        control character". That is a formatting slip, not a wrong answer, so
+        control characters are allowed. Fenced blocks and prose around the object
+        are tolerated too. Anything genuinely malformed still raises.
+        """
         value = raw.strip()
         if value.startswith("```"):
             value = value.split("\n", 1)[1].rsplit("```", 1)[0]
-        data = json.loads(value)
+        try:
+            data = json.loads(value, strict=False)
+        except json.JSONDecodeError:
+            start, end = value.find("{"), value.rfind("}")
+            if start == -1 or end <= start:
+                raise
+            data = json.loads(value[start : end + 1], strict=False)
         if not isinstance(data, dict):
             raise TypeError("Agent response must be a JSON object")
         return data
