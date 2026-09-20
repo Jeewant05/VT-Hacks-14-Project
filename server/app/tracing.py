@@ -9,6 +9,7 @@ import json
 import logging
 import re
 from collections import deque
+from datetime import UTC, datetime
 from typing import Protocol
 
 from databricks.sdk import WorkspaceClient
@@ -18,6 +19,22 @@ from server.app.models import TraceEvent, WriteReceipt
 
 log = logging.getLogger("synapse")
 _TABLE_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*){2}$")
+
+
+def _as_utc_iso(value: str) -> str:
+    """Return a timezone-aware ISO string for a Databricks TIMESTAMP cast.
+
+    `CAST(ts AS STRING)` yields "2026-09-20 07:17:11.611507" in the session
+    zone (UTC) with no offset, which a browser then reads as local time. Any
+    string that already carries an offset is returned as-is.
+    """
+    try:
+        parsed = datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return value
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.isoformat()
 
 
 class TraceSink(Protocol):
@@ -106,7 +123,7 @@ class DatabricksTraceSink:
                     log.warning("Skipping malformed Databricks trace payload for %s", row[0])
                     payload = {"raw_payload": str(row[8]), "payload_parse_error": True}
             events.append(TraceEvent(
-                trace_id=row[0], source=row[1], event_type=row[2], timestamp=row[3],
+                trace_id=row[0], source=row[1], event_type=row[2], timestamp=_as_utc_iso(row[3]),
                 run_id=row[4], objective_id=row[5], workstream_id=row[6], agent_id=row[7], payload=payload,
             ))
         return events
