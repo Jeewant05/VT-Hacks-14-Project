@@ -19,7 +19,7 @@ from server.app.orchestration_routes import build_orchestration_router
 from server.app.providers import build_agent_providers
 from server.app.routes import build_router
 from server.app.service import Coordinator
-from server.app.store import read_state
+from server.app.store import read_state, write_state
 from server.app.trace_routes import build_trace_router
 from server.app.tracing import build_trace_sink
 
@@ -38,6 +38,22 @@ def _fresh_state_for(settings: Settings):
     return build
 
 
+def _seed_if_empty(settings: Settings) -> None:
+    """Give a blank database the demo fixture before the first request.
+
+    A fresh deployment has no volume contents and nobody to run `npm run seed`,
+    so without this the dashboard's first paint is an empty workspace with no
+    objective and no way to start one.
+    """
+    path = settings.resolved_database_path
+    if read_state(path).objective is not None:
+        return
+    from scripts.database import demo_state
+
+    log.info("empty workspace at %s; seeding the demo fixture", path)
+    write_state(path, demo_state(settings.ans_domain))
+
+
 def build_identity(settings: Settings) -> IdentityAdapter:
     # ans mode fails fast on missing credentials rather than silently falling back
     # to the fixture, which would misreport the demo as verified.
@@ -51,15 +67,20 @@ def build_identity(settings: Settings) -> IdentityAdapter:
 def build_memory(settings: Settings) -> MemoryAdapter:
     seeded = read_state(settings.resolved_database_path).decisions
     if settings.memory_mode == "databricks":
-        from server.app.memory_databricks import DatabricksMemory
-
-        return DatabricksMemory(settings, fallback=CacheMemory(seeded))
+        # No Databricks memory implementation exists. Warn rather than crash, and
+        # never let the dashboard report decisions as anything but the fixture
+        # they are.
+        log.warning(
+            "MEMORY_MODE=databricks has no implementation; decision memory stays "
+            "the local fixture"
+        )
     return CacheMemory(seeded)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     require_demo_token_for_public(settings)
+    _seed_if_empty(settings)
     app = FastAPI(title="Synapse API", version="0.6.0")
     app.add_middleware(
         CORSMiddleware,

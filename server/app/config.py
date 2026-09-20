@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     gemini_api_key_backend: str | None = None
     gemini_api_key_frontend: str | None = None
     gemini_api_key_qa: str | None = None
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.6-flash"
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
 
     # Hugging Face Inference Providers: one shared token, optionally one model per role.
@@ -91,9 +91,10 @@ class Settings(BaseSettings):
     databricks_schema: str = ""
     databricks_trace_table: str = "synapse_agent_traces"
 
-    # Loopback address the server-side demo runner posts to. Proofs are signed
-    # against ans_public_base_url, not this, so the two differ by design.
-    local_base_url: str = "http://127.0.0.1:8080"
+    # Loopback address the server-side demo runner posts to. The dev port;
+    # fly.toml sets 8080 explicitly. Proofs are signed against
+    # ans_public_base_url, not this, so the two differ by design.
+    local_base_url: str = "http://127.0.0.1:8000"
 
     @property
     def resolved_database_path(self) -> Path:

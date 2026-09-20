@@ -47,6 +47,24 @@ class DemoRunResponse(BaseModel):
     detail: str | None = None
 
 
+def _client_for(settings: Settings, local_base: str, agent_id: str) -> AgentClient:
+    """One scripted agent's client, signed only when the coordinator checks proofs.
+
+    Mock mode has no identity material and needs none, so building a signer there
+    would fail the whole run on a fresh clone for a gate that is not armed.
+
+    In ANS mode the proof is signed against the public origin but sent over
+    loopback: an ANS-6 verifier compares `htu` to its configured authority and
+    never reads the `Host` header, so the proof is the same one an external
+    caller would present.
+    """
+    if settings.identity_mode != "ans":
+        return AgentClient(base_url=local_base, agent_id=agent_id)
+    certificate_pem, key_pem = load_material(agent_id, settings.ans_agent_identities)
+    signer = DpopSigner.from_pem(certificate_pem, key_pem, settings.ans_public_base_url)
+    return AgentClient(base_url=local_base, agent_id=agent_id, signer=signer)
+
+
 def _run(settings: Settings, local_base: str) -> DemoRunResponse:
     """Drive the three scripted agents with real DPoP proofs.
 
@@ -56,14 +74,7 @@ def _run(settings: Settings, local_base: str) -> DemoRunResponse:
     agent must be re-scoped before the first submit -- the same order the
     dashboard used to drive by hand.
     """
-    clients = {}
-    for agent_id, _workstream, _contract, _files in PLAN:
-        # Signed against the public origin, sent over loopback: an ANS-6 verifier
-        # compares htu to its configured authority and never reads the Host
-        # header, so the proof is the same one an external caller would present.
-        certificate_pem, key_pem = load_material(agent_id, settings.ans_agent_identities)
-        signer = DpopSigner.from_pem(certificate_pem, key_pem, settings.ans_public_base_url)
-        clients[agent_id] = AgentClient(base_url=local_base, agent_id=agent_id, signer=signer)
+    clients = {a: _client_for(settings, local_base, a) for a, *_ in PLAN}
 
     for agent_id, _ws, _contract, _files in PLAN:
         clients[agent_id].join()
