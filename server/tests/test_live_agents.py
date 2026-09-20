@@ -220,3 +220,79 @@ def test_failure_headlines_name_the_actual_cause():
     assert "rate limiting" in explain_failure("groq 429: rate limit exceeded")
     assert "not configured" in explain_failure("HUGGINGFACE_API_KEY is not set")
     assert "could not be reached" in explain_failure("huggingface request timed out")
+
+
+# --- File-count limits: stated, counted, and retried once ---------------------
+
+
+class OverproducingProvider(FakeProvider):
+    """Returns too many files for its first `bad_answers` build answers, then behaves."""
+
+    def __init__(self, role: str, bad_answers: int, too_many: int = 9):
+        super().__init__(role)
+        self.bad_answers, self.too_many, self.build_calls = bad_answers, too_many, 0
+
+    async def generate(self, prompt: str) -> str:
+        if "Do not write code yet" in prompt:
+            return await super().generate(prompt)
+        self.build_calls += 1
+        if self.build_calls <= self.bad_answers:
+            files = [{"path": f"backend/part{i}.py", "content": "x = 1\n"} for i in range(self.too_many)]
+            return json.dumps({"report": "Split everything into many files.", "files": files})
+        return await super().generate(prompt)
+
+
+def swap_backend(provider):
+    mixed = providers()
+    mixed["backend"] = provider
+    return mixed
+
+
+def test_the_prompt_states_the_file_limit_the_validator_enforces(tmp_path):
+    """The limit was enforced but never mentioned, so models exceeded it blindly."""
+    backend = FakeProvider("backend")
+    run = LiveRun("run-limits", "Build tasks", tmp_path / "run-limits", swap_backend(backend))
+    asyncio.run(run.execute())
+
+    build_prompt = next(p for p in backend.prompts if "Do not write code yet" not in p)
+    assert "between 1 and 6 files" in build_prompt
+    assert "characters" in build_prompt
+
+
+def test_one_over_limit_answer_is_corrected_by_a_retry(tmp_path):
+    flaky = OverproducingProvider("backend", bad_answers=1)
+    run = LiveRun("run-retry", "Build tasks", tmp_path / "run-retry", swap_backend(flaky))
+
+    asyncio.run(run.execute())
+
+    assert run.status == "complete"
+    assert flaky.build_calls == 2
+    retry = next(e for e in run.events if e["event_type"] == "proposal_retry")
+    assert "returned 9 files" in retry["message"]
+    # The model is told what was wrong, so the second answer can fix it.
+    assert "rejected: returned 9 files" in flaky.prompts[-1]
+
+
+def test_a_persistent_over_limit_answer_fails_and_reports_the_count(tmp_path):
+    stubborn = OverproducingProvider("backend", bad_answers=99, too_many=9)
+    run = LiveRun("run-stubborn", "Build tasks", tmp_path / "run-stubborn", swap_backend(stubborn))
+
+    asyncio.run(run.execute())
+
+    assert run.status == "failed"
+    assert stubborn.build_calls == 2  # one retry, not a loop
+    assert "backend returned 9 files; it must return 1-6" in run.snapshot()["error"]
+    assert run.snapshot()["failure_title"] == "The agent build failed validation."
+
+
+def test_an_empty_answer_is_reported_as_empty_not_as_a_bad_count(tmp_path):
+    class Empty(FakeProvider):
+        async def generate(self, prompt: str) -> str:
+            if "Do not write code yet" in prompt:
+                return await super().generate(prompt)
+            return json.dumps({"report": "Nothing to do.", "files": []})
+
+    run = LiveRun("run-empty", "Build tasks", tmp_path / "run-empty", swap_backend(Empty("backend")))
+    asyncio.run(run.execute())
+    assert run.status == "failed"
+    assert "returned no files" in run.snapshot()["error"]
