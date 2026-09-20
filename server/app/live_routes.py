@@ -48,6 +48,10 @@ def build_live_router(runs: LiveRuns) -> APIRouter:
             raise HTTPException(422, str(exc)) from exc
         return LiveRunResponse(run_id=run.run_id, status=run.status)
 
+    @router.get("/runs")
+    async def recent_runs():
+        return [run.snapshot() for run in runs.recent()]
+
     @router.get("/runs/{run_id}")
     async def snapshot(run_id: str):
         try:

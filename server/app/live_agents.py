@@ -264,7 +264,10 @@ Hard limits -- a response outside them is rejected:
         try:
             proposal = self._json(raw)
         except (ValueError, TypeError):
-            return None, "returned something that was not a single JSON object"
+            return None, (
+                "returned malformed JSON; escape newlines, quotes, and backslashes inside every "
+                "file content string and return one JSON object only"
+            )
         files = proposal.get("files")
         if not isinstance(files, list) or not isinstance(proposal.get("report"), str):
             return None, 'must return JSON with a "report" string and a "files" list'
@@ -275,6 +278,11 @@ Hard limits -- a response outside them is rejected:
                 f"returned {len(files)} files; it must return 1-{MAX_FILES_PER_AGENT}. "
                 "Merge related code into fewer files"
             )
+        for entry in files:
+            if not isinstance(entry, dict):
+                return None, "returned a file entry that was not an object"
+            if not isinstance(entry.get("path"), str) or not isinstance(entry.get("content"), str) or not entry["content"].strip():
+                return None, "returned a file without a non-empty path and content"
         oversized = [
             str(f.get("path")) for f in files
             if isinstance(f, dict) and len(str(f.get("content", ""))) > MAX_FILE_CHARS

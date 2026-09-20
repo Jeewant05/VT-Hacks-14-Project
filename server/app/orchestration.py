@@ -20,6 +20,7 @@ from server.app.models import (
     ResolutionProposal,
     TraceEvent,
 )
+from server.app.orchestrator_agent import OrchestratorAgent
 from server.app.store import read_orchestration_state, write_orchestration_state
 from server.app.tracing import TraceSink
 
@@ -242,7 +243,11 @@ class OrchestrationKernel:
     async def propose_resolution(self, conflict_id: str) -> ResolutionProposal:
         state = read_orchestration_state(self.db_path)
         conflict = next((c for c in state.conflicts if c.conflict_id == conflict_id), None)
-        if conflict is None or conflict.status != "OPEN":
+        if conflict is None:
+            raise OrchestrationError("open conflict not found")
+        if conflict.status == "RESOLUTION_PROPOSED" and conflict.resolution:
+            return ResolutionProposal.model_validate(conflict.resolution)
+        if conflict.status != "OPEN":
             raise OrchestrationError("open conflict not found")
         if conflict.type != "CONTRACT_CONFLICT":
             raise OrchestrationError("this demo resolver only proposes deterministic contract updates")
@@ -253,6 +258,22 @@ class OrchestrationKernel:
         conflict.status, conflict.recommended_action = "RESOLUTION_PROPOSED", proposal.recommended_action
         write_orchestration_state(self.db_path, state)
         return proposal
+
+    async def orchestrate(self, objective_id: str, agent: OrchestratorAgent) -> OrchestrationState:
+        """Ask the proposal agent for resolutions and retain its rationale as trace evidence."""
+        state = self.state(objective_id)
+        open_conflicts = [conflict for conflict in state.conflicts if conflict.status == "OPEN"]
+        await self._event(state, "orchestrator_started", agent_id=agent.id,
+                          payload={"open_conflicts": len(open_conflicts)})
+        for conflict in open_conflicts:
+            proposal = await agent.propose(state, conflict)
+            conflict.status = "RESOLUTION_PROPOSED"
+            conflict.recommended_action = proposal.recommended_action
+            conflict.resolution = proposal.model_dump()
+            await self._event(state, "orchestrator_proposal", agent_id=agent.id,
+                              payload={"conflict_id": conflict.conflict_id, "proposal": proposal.model_dump()})
+        write_orchestration_state(self.db_path, state)
+        return state
 
     async def approve_resolution(self, conflict_id: str, approved_by: str) -> OrchestrationState:
         state = read_orchestration_state(self.db_path)

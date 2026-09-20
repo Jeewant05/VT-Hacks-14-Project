@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parents[2]
 Vendor = Literal[
-    "none", "gemini", "huggingface", "cerebras", "groq", "github", "openrouter", "openai"
+    "none", "arc", "gemini", "huggingface", "cerebras", "groq", "github", "openrouter", "openai"
 ]
 
 
@@ -24,6 +24,19 @@ class Settings(BaseSettings):
     backend_provider: Vendor = "none"
     frontend_provider: Vendor = "none"
     qa_provider: Vendor = "none"
+    orchestrator_provider: Vendor = "none"
+
+    # Virginia Tech ARC exposes an OpenAI-compatible chat-completions API.
+    arc_api_key_backend: str | None = None
+    arc_api_key_frontend: str | None = None
+    arc_api_key_qa: str | None = None
+    arc_api_key_orchestrator: str | None = None
+    arc_model: str = "gpt-oss-120b"
+    arc_model_backend: str | None = None
+    arc_model_frontend: str | None = None
+    arc_model_qa: str | None = None
+    arc_model_orchestrator: str | None = None
+    arc_base_url: str = "https://llm-api.arc.vt.edu/api/v1"
 
     # Gemini supports a shared fallback key plus a dedicated key for each role.
     gemini_api_key: str | None = None

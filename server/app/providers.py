@@ -96,6 +96,7 @@ class OpenAICompatibleProvider:
 
 # vendor -> (default base_url, default model)
 OPENAI_COMPATIBLE = {
+    "arc": ("https://llm-api.arc.vt.edu/api/v1", "gpt-oss-120b"),
     "cerebras": ("https://api.cerebras.ai/v1", "llama-3.3-70b"),
     "groq": ("https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
     "github": ("https://models.inference.ai.azure.com", "gpt-4o-mini"),
@@ -117,9 +118,10 @@ def build_provider(vendor: str, settings: Settings, role: str = "") -> Provider:
         return OpenAICompatibleProvider("huggingface", key, model, settings.huggingface_base_url)
     if vendor in OPENAI_COMPATIBLE:
         default_url, default_model = OPENAI_COMPATIBLE[vendor]
-        key = getattr(settings, f"{vendor}_api_key", "") or ""
-        model = getattr(settings, f"{vendor}_model", "") or default_model
-        return OpenAICompatibleProvider(vendor, key, model, default_url)
+        key = getattr(settings, f"{vendor}_api_key_{role}", None) or getattr(settings, f"{vendor}_api_key", "") or ""
+        model = getattr(settings, f"{vendor}_model_{role}", None) or getattr(settings, f"{vendor}_model", "") or default_model
+        base_url = getattr(settings, f"{vendor}_base_url", "") or default_url
+        return OpenAICompatibleProvider(vendor, key, model, base_url)
     raise ProviderError(f"unknown provider {vendor!r}")
 
 

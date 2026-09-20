@@ -9,6 +9,7 @@ from server.app.live_agents import Artifact, LiveRun, LiveRuns
 from server.app.live_preview import render_agent_preview
 from server.app.live_routes import build_live_router
 from server.app.main import create_app
+from server.app.tracing import CacheTraceSink
 
 
 class FakeProvider:
@@ -58,6 +59,38 @@ class FakeProvider:
         return json.dumps(responses[self.role])
 
 
+class MalformedProposalThenValidProvider(FakeProvider):
+    def __init__(self, role: str):
+        super().__init__(role)
+        self.build_calls = 0
+
+    async def generate(self, prompt: str) -> str:
+        if "Do not write code yet" in prompt:
+            return await super().generate(prompt)
+        self.prompts.append(prompt)
+        self.build_calls += 1
+        if self.build_calls == 1:
+            return json.dumps({
+                "report": "I made the frontend.",
+                "files": [{"path": "frontend/App.tsx"}],
+            })
+        return json.dumps({
+            "report": "Built the task list.",
+            "files": [
+                {"path": "frontend/App.tsx", "content": "export function App() { return null }\n"},
+                {
+                    "path": "frontend/preview.json",
+                    "content": json.dumps({
+                        "title": "Task Flow", "subtitle": "Tasks stay in sync.",
+                        "accent": "#6d5dfc", "primary_action": "Add task",
+                        "metrics": [],
+                        "cards": [{"title": "First task", "description": "Ready to ship.", "badge": "Open"}],
+                    }),
+                },
+            ],
+        })
+
+
 def providers(invalid_frontend: bool = False):
     return {
         "backend": FakeProvider("backend"),
@@ -97,6 +130,7 @@ def test_three_apis_plan_then_generate_scoped_project(tmp_path):
     assert run.preview_html is not None
     assert "Task Flow" in run.preview_html
     assert run.snapshot()["preview_url"] == "/api/live/runs/run-test/preview"
+    assert run.snapshot()["git_repository"] is True
     assert run.events[-1]["event_type"] == "run_complete"
 
 
@@ -111,7 +145,60 @@ def test_invalid_proposal_commits_no_files(tmp_path):
     assert run.events[-1]["event_type"] == "run_failed"
     assert "outside frontend/" in run.events[-1]["message"]
     assert run.artifacts == []
-    assert list(run.root.rglob("*")) == []
+    assert (run.root / ".git").is_dir()
+    assert not [
+        path for path in run.root.rglob("*")
+        if ".git" not in path.parts and path.name != ".synapse-run.json"
+    ]
+
+
+def test_malformed_file_proposal_is_corrected_once_before_staging(tmp_path):
+    agent_providers = providers()
+    frontend = MalformedProposalThenValidProvider("frontend")
+    agent_providers["frontend"] = frontend
+    run = LiveRun("run-retry", "Build tasks", tmp_path / "run-retry", agent_providers)
+
+    asyncio.run(run.execute())
+
+    assert run.status == "complete"
+    assert frontend.build_calls == 2
+    assert "previous proposal was invalid" in frontend.prompts[-1]
+
+
+def test_completed_run_flushes_its_trace_events(tmp_path):
+    trace = CacheTraceSink()
+    run = LiveRun("run-traced", "Build tasks", tmp_path / "run-traced", providers(), trace)
+
+    asyncio.run(run.execute())
+    events = asyncio.run(trace.recent(run_id="run-traced"))
+
+    assert run.status == "complete"
+    assert events[0].event_type == "run_complete"
+    assert any(event.event_type == "validation_passed" for event in events)
+
+
+def test_completed_run_can_be_restored_after_api_restart(tmp_path):
+    root = tmp_path / "run-restored"
+    run = LiveRun("run-restored", "Build tasks", root, providers())
+
+    asyncio.run(run.execute())
+    restored = LiveRun.load(root)
+
+    assert restored is not None
+    assert restored.status == "complete"
+    assert restored.snapshot()["artifacts"] == run.snapshot()["artifacts"]
+
+
+def test_legacy_workspace_can_be_recovered_for_dashboard(tmp_path):
+    root = tmp_path / "run-legacy"
+    (root / "backend").mkdir(parents=True)
+    (root / "backend" / "main.py").write_text("print('ready')\n", encoding="utf-8")
+
+    recovered = LiveRun.recover(root)
+
+    assert recovered is not None
+    assert recovered.status == "complete"
+    assert recovered.artifacts[0].agent_id == "backend"
 
 
 def test_preview_escapes_agent_content_and_is_served_with_a_sandbox(tmp_path):

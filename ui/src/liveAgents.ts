@@ -11,6 +11,8 @@ export type LiveSnapshot = {
   run_id: string;
   objective: string;
   status: 'queued' | 'planning' | 'building' | 'complete' | 'failed';
+  workspace: string;
+  git_repository: boolean;
   artifacts: LiveArtifact[];
   intentions: Record<string, string>;
   reports: Record<string, string>;
@@ -30,6 +32,15 @@ export type LiveConfig = {
     provider: string | null;
     model: string | null;
   }[];
+};
+export type LiveTrace = {
+  trace_id: string;
+  source: string;
+  event_type: string;
+  timestamp: string;
+  run_id: string | null;
+  agent_id: string | null;
+  payload: { message?: unknown };
 };
 
 async function json<T>(response: Response): Promise<T> {
@@ -51,6 +62,15 @@ export async function startLiveRun(objective: string): Promise<{ run_id: string;
 
 export async function getLiveRun(runId: string): Promise<LiveSnapshot> {
   return json(await fetch(`/api/live/runs/${runId}`));
+}
+
+export async function getLiveRuns(): Promise<LiveSnapshot[]> {
+  return json(await fetch('/api/live/runs'));
+}
+
+export async function getLiveTraces(runId?: string): Promise<LiveTrace[]> {
+  const suffix = runId ? `&run_id=${encodeURIComponent(runId)}` : '';
+  return json(await fetch(`/api/traces?limit=30${suffix}`));
 }
 
 export function subscribeLiveRun(runId: string, onEvent: (event: LiveEvent) => void): EventSource {

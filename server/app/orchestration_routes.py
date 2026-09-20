@@ -15,6 +15,7 @@ from server.app.models import (
     ResolutionProposal,
 )
 from server.app.orchestration import OrchestrationError, OrchestrationKernel
+from server.app.orchestrator_agent import OrchestratorAgent
 
 
 class ObjectiveRequest(BaseModel):
@@ -34,6 +35,7 @@ class ResolutionApproval(BaseModel):
 
 def build_orchestration_router(
     kernel: OrchestrationKernel,
+    orchestrator: OrchestratorAgent,
     ans_identity: AnsIdentity | None = None,
     dpop_required: bool = True,
 ) -> APIRouter:
@@ -62,17 +64,30 @@ def build_orchestration_router(
         except OrchestrationError as error:
             raise fail(error) from error
 
+    @router.post("/objectives/{objective_id}/orchestrate", response_model=OrchestrationState)
+    async def orchestrate(objective_id: str):
+        try:
+            return await kernel.orchestrate(objective_id, orchestrator)
+        except OrchestrationError as error:
+            raise fail(error) from error
+
     @router.post("/agents/{agent_id}/plan", response_model=OrchestrationState)
     async def plan(agent_id: str, caller: Caller, intention: IntentionDocument | None = None):
         try:
-            return await kernel.plan(agent_id, intention, proven_ans_name=proven(caller))
+            state = await kernel.plan(agent_id, intention, proven_ans_name=proven(caller))
+            if state.workstreams and all(workstream.intention for workstream in state.workstreams):
+                return await kernel.orchestrate(state.objective.id, orchestrator)
+            return state
         except OrchestrationError as error:
             raise fail(error) from error
 
     @router.post("/intentions/validate", response_model=OrchestrationState)
     async def validate_intention(intention: IntentionDocument, caller: Caller):
         try:
-            return await kernel.plan(intention.agent_id, intention, proven_ans_name=proven(caller))
+            state = await kernel.plan(intention.agent_id, intention, proven_ans_name=proven(caller))
+            if state.workstreams and all(workstream.intention for workstream in state.workstreams):
+                return await kernel.orchestrate(state.objective.id, orchestrator)
+            return state
         except OrchestrationError as error:
             raise fail(error) from error
 

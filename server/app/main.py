@@ -14,8 +14,9 @@ from server.app.live_agents import LiveRuns
 from server.app.live_routes import build_live_router
 from server.app.models import Health, WorkspaceState
 from server.app.orchestration import OrchestrationKernel
+from server.app.orchestrator_agent import OrchestratorAgent
 from server.app.orchestration_routes import build_orchestration_router
-from server.app.providers import build_agent_providers
+from server.app.providers import ProviderError, build_agent_providers, build_provider
 from server.app.routes import build_router
 from server.app.service import Coordinator
 from server.app.store import read_state, write_state
@@ -121,14 +122,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
     )
     app.include_router(build_trace_router(trace))
+    configured = build_agent_providers(settings)
+    try:
+        orchestrator_provider = build_provider(settings.orchestrator_provider, settings, "orchestrator") \
+            if settings.orchestrator_provider != "none" else None
+    except ProviderError:  # Provider availability is surfaced by orchestrator trace fallback.
+        orchestrator_provider = None
     app.include_router(
         build_orchestration_router(
             OrchestrationKernel(settings.resolved_database_path, identity, trace),
+            OrchestratorAgent(orchestrator_provider),
             ans_identity=ans_identity,
             dpop_required=settings.ans_dpop_required,
         )
     )
-    configured = build_agent_providers(settings)
     providers = {
         role: configured[source]
         for role, source in {

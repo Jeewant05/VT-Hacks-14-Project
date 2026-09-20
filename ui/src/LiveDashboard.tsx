@@ -1,36 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { FileCode2, GitBranch, GitCommitHorizontal, GitCompareArrows, LoaderCircle, UploadCloud } from 'lucide-react';
 import {
-  getLiveConfig, getLiveRun, startLiveRun, subscribeLiveRun,
-  type LiveArtifact, type LiveConfig, type LiveEvent, type LiveSnapshot,
+  getLiveConfig, getLiveRun, getLiveTraces, startLiveRun, subscribeLiveRun,
+  type LiveArtifact, type LiveConfig, type LiveEvent, type LiveSnapshot, type LiveTrace,
 } from './liveAgents';
-import { Logo } from './components';
 
-type Props = { onSimulation: () => void };
-const initialObjective = 'Build a small task manager with a FastAPI backend, React frontend, and contract tests.';
 const roleIds = ['backend', 'frontend', 'integration'] as const;
+const initialObjective = 'Build a small task manager with a FastAPI backend, React frontend, and contract tests.';
 
-/** Provider errors arrive as `vendor 402: {"error":"..."}`; show just the sentence. */
-function readableDetail(raw: string): string {
-  const brace = raw.indexOf('{');
-  if (brace >= 0) {
-    try {
-      const parsed = JSON.parse(raw.slice(brace)) as { error?: string | { message?: string }; message?: string };
-      const inner = typeof parsed.error === 'string' ? parsed.error : parsed.error?.message ?? parsed.message;
-      if (inner) return inner;
-    } catch { /* not JSON: fall through to the raw text */ }
-  }
-  return raw.length > 240 ? `${raw.slice(0, 240)}…` : raw;
-}
-
-export function LiveDashboard({ onSimulation }: Props) {
+export function LiveDashboard({ onHub, repositoryMode = false }: { onHub?: (hasRun: boolean) => void; repositoryMode?: boolean }) {
   const [objective, setObjective] = useState(initialObjective);
   const [config, setConfig] = useState<LiveConfig | null>(null);
   const [run, setRun] = useState<LiveSnapshot | null>(null);
   const [events, setEvents] = useState<LiveEvent[]>([]);
+  const [traces, setTraces] = useState<LiveTrace[]>([]);
   const [selectedPath, setSelectedPath] = useState('shared/api-contract.json');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [previewNotice, setPreviewNotice] = useState('');
   const sourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
@@ -56,59 +42,14 @@ export function LiveDashboard({ onSimulation }: Props) {
   async function refresh(runId: string) {
     const snapshot = await getLiveRun(runId);
     setRun(snapshot);
+    void getLiveTraces(runId).then(setTraces).catch(() => undefined);
     if (!selectedPath && snapshot.artifacts.length) setSelectedPath(snapshot.artifacts[0].path);
     return snapshot;
   }
 
-  function preparePreviewTab() {
-    const tab = window.open('', '_blank');
-    if (!tab) {
-      setPreviewNotice('Your browser blocked the preview tab. You can open it after the run finishes.');
-      return null;
-    }
-    tab.opener = null;
-    tab.document.title = 'Agents are building…';
-    tab.document.body.style.cssText = 'margin:0;min-height:100vh;display:grid;place-items:center;background:#f5f8f5;color:#20362b;font-family:system-ui,sans-serif';
-    const panel = tab.document.createElement('div');
-    panel.style.cssText = 'width:min(520px,calc(100% - 48px));padding:36px;border:1px solid #dbe7dc;border-radius:18px;background:white;box-shadow:0 18px 60px #23452b18';
-    const label = tab.document.createElement('p');
-    label.textContent = 'SYNAPSE · LIVE BUILD';
-    label.style.cssText = 'color:#247457;font-size:12px;font-weight:800;letter-spacing:.14em';
-    const heading = tab.document.createElement('h1');
-    heading.textContent = 'Three agents are building your app.';
-    const copy = tab.document.createElement('p');
-    copy.textContent = 'This tab will automatically switch to the finished work after intentions, code, and the preview are validated.';
-    copy.style.cssText = 'color:#65776b;line-height:1.6';
-    panel.append(label, heading, copy);
-    tab.document.body.append(panel);
-    return tab;
-  }
-
-  function finishPreview(snapshot: LiveSnapshot, tab: Window | null) {
-    if (snapshot.status === 'complete' && snapshot.preview_url) {
-      if (tab && !tab.closed) tab.location.replace(snapshot.preview_url);
-      setPreviewNotice(tab ? 'Finished app opened in the preview tab.' : 'Finished app is ready to open.');
-    } else if (snapshot.status === 'failed') {
-      // Say what actually failed. A provider rejecting the request (out of credits,
-      // bad key) is not a validation failure, and reporting it as one sends people
-      // to debug generated code when nothing was ever generated.
-      const title = snapshot.failure_title ?? 'The agent build failed validation.';
-      const detail = snapshot.error ? readableDetail(snapshot.error) : '';
-      if (tab && !tab.closed) {
-        tab.document.title = 'Agent build failed';
-        const heading = tab.document.querySelector('h1');
-        const copy = tab.document.querySelector('div > p:last-child');
-        if (heading) heading.textContent = title;
-        if (copy) copy.textContent = detail || 'Return to the Synapse dashboard to inspect the coordinator timeline.';
-      }
-      setPreviewNotice(detail ? `${title} ${detail}` : title);
-    }
-  }
-
   async function start() {
-    setPreviewNotice('');
-    const previewTab = preparePreviewTab();
-    setBusy(true); setError(''); setEvents([]); setRun(null); setSelectedPath('shared/api-contract.json');
+    if (!objective.trim()) { setError('Describe the change you want the team to make.'); return; }
+    setBusy(true); setError(''); setEvents([]); setTraces([]); setRun(null); setSelectedPath('shared/api-contract.json');
     sourceRef.current?.close();
     try {
       const result = await startLiveRun(objective);
@@ -118,56 +59,57 @@ export function LiveDashboard({ onSimulation }: Props) {
         void refresh(result.run_id).catch(() => undefined);
         if (event.event_type === 'run_complete' || event.event_type === 'run_failed') {
           source.close();
-          void refresh(result.run_id).then(snapshot => finishPreview(snapshot, previewTab)).catch(() => undefined);
         }
       });
       source.onerror = () => {
         source.close();
-        void refresh(result.run_id).then(snapshot => finishPreview(snapshot, previewTab)).catch(() => undefined);
+        void refresh(result.run_id).catch(() => undefined);
       };
       sourceRef.current = source;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not start the coding agents.');
-      if (previewTab && !previewTab.closed) previewTab.close();
     } finally { setBusy(false); }
   }
 
   function reset() {
-    sourceRef.current?.close(); setRun(null); setEvents([]); setError(''); setPreviewNotice('');
+    sourceRef.current?.close(); setRun(null); setEvents([]); setTraces([]); setError('');
     setSelectedPath('shared/api-contract.json');
   }
 
-  function openFinishedPreview() {
-    if (run?.preview_url) window.open(run.preview_url, '_blank', 'noopener,noreferrer');
-  }
-
-  return <main className="live-shell">
+  return <div className="live-shell">
     <header className="live-header">
-      <div><Logo /><p className="eyebrow">SYNAPSE · OPEN MODEL CODE LAB</p><h1>Three agents. One coordinated project.</h1><p>Frontend and backend build in parallel. The integration agent reviews both, then the coordinator validates every generated path before writing it.</p></div>
-      <button className="secondary" onClick={onSimulation}>Open guided simulation</button>
+      <div><p className="eyebrow">SYNAPSE · {repositoryMode ? 'REPOSITORY' : 'COORDINATED CODE WORKSPACE'}</p><h1>{repositoryMode ? 'Generated project repository' : 'See independent agents coordinate one change.'}</h1><p>{repositoryMode ? 'Browse the real files created by the latest coordinated run. Each entry is owned by one agent and is ready for continued development.' : 'Agents publish intent before writing. Synapse validates ownership, records the decision trail, and writes the approved result into a real local Git workspace.'}</p></div>{onHub && <button className="secondary" onClick={() => onHub(Boolean(run))}>Open workspace hub</button>}
     </header>
 
-    <section className="prompt-card">
+    {!repositoryMode && <section className="prompt-card">
       <div className="prompt-heading"><div><label htmlFor="objective">Project objective</label><small>{config ? `3 role providers · ${config.configured ? 'ready' : 'setup required'}` : 'Checking configuration…'}</small></div>{run && <span className={`run-status status-${run.status}`}>{run.status}</span>}</div>
-      <textarea id="objective" value={objective} maxLength={2000} onChange={event => setObjective(event.target.value)} disabled={busy || !!run} />
-      <div className="prompt-actions"><button className="primary" onClick={start} disabled={busy || !!run || !config?.configured}>{busy ? 'Starting…' : 'Start three coding agents'}</button>{run?.preview_url && <button className="secondary" onClick={openFinishedPreview}>Open finished app</button>}{run && <button className="secondary" onClick={reset} disabled={run.status === 'planning' || run.status === 'building'}>New run</button>}<span>Generated code stays in an isolated local run directory.</span></div>
-      {previewNotice && <p className="preview-notice">{previewNotice}</p>}
+      <textarea id="objective" value={objective} placeholder="Describe the change this team should implement…" maxLength={2000} onChange={event => setObjective(event.target.value)} disabled={busy || !!run} />
+      <div className="prompt-actions"><button className="primary" onClick={start} disabled={busy || !!run || !config?.configured || !objective.trim()}>{busy ? 'Starting…' : 'Run coordinated change'}</button>{run && <button className="secondary" onClick={reset} disabled={run.status === 'planning' || run.status === 'building'}>New run</button>}<span>{run?.git_repository ? `Git workspace: ${run.workspace}` : 'Choose an objective to create a Git-backed workspace.'}</span></div>
       {config && !config.configured && <div className="setup-note"><strong>Three agent APIs needed.</strong> Set <code>BACKEND_PROVIDER</code>, <code>FRONTEND_PROVIDER</code>, and <code>QA_PROVIDER</code>, plus the matching API keys in <code>.env</code>, then restart the API.</div>}
-    </section>
+    </section>}
 
     {error && <div className="error-card"><strong>Live run error</strong><pre>{error}</pre></div>}
 
-    <section className="live-agent-grid">{roleIds.map(agent => {
+    {!repositoryMode && <section className="live-agent-grid">{roleIds.map(agent => {
       const details = config?.roles.find(role => role.id === agent);
       const count = artifacts.filter(item => item.agent_id === agent).length;
       return <article className={`agent-card-live state-${roleStatus[agent].toLowerCase().replaceAll(' ', '-')}`} key={agent}><div className="agent-dot" /><div><h2>{details?.title ?? agent}<span className={details?.configured ? 'api-ready' : 'api-missing'}>{details?.configured ? 'API ready' : 'API missing'}</span></h2><p>{details?.responsibility}</p>{details?.configured && <p className="agent-provider">{details.provider} · {details.model}</p>}{run?.intentions[agent] && <blockquote className="agent-intention"><b>Intention</b>{run.intentions[agent]}</blockquote>}<small>{roleStatus[agent]}{count ? ` · ${count} file${count === 1 ? '' : 's'}` : ''}</small></div></article>;
-    })}</section>
+    })}</section>}
 
     <section className="live-workspace">
-      <div className="panel artifact-panel"><div className="panel-title"><h2>Generated project</h2><span>{artifacts.length} files</span></div><div className="artifact-browser"><nav>{artifacts.map(artifact => <ArtifactButton key={artifact.path} artifact={artifact} active={artifact.path === selected?.path} onClick={() => setSelectedPath(artifact.path)} />)}{!artifacts.length && <p className="empty">Files will appear as the agents finish.</p>}</nav><div className="artifact-preview"><div><b>{selected?.path ?? 'No file selected'}</b>{selected && <span>{selected.agent_id}</span>}</div><pre>{selected?.content ?? 'Start a run to generate a project.'}</pre></div></div></div>
-      <div className="panel activity-panel-live"><div className="panel-title"><h2>Coordinator timeline</h2><span>{events.length} events</span></div><ol className="event-list">{events.map((event, index) => <li key={`${event.timestamp}-${index}`}><b>{event.agent_id}</b><span>{event.event_type.replaceAll('_', ' ')}</span><p>{event.message}</p></li>)}{!events.length && <li className="empty">Agent activity will stream here in real time.</li>}</ol></div>
+      <div className="panel artifact-panel"><div className="panel-title"><h2>{repositoryMode ? 'Files changed in this run' : 'Generated project'}</h2><span>{artifacts.length} files</span></div>{repositoryMode && <div className="repo-status-bar"><span><GitBranch size={14} /> local workspace</span><span><GitCompareArrows size={14} /> {artifacts.length} added files</span><span><UploadCloud size={14} /> Remote push not configured</span></div>}<div className="artifact-browser"><nav>{artifacts.map(artifact => <ArtifactButton key={artifact.path} artifact={artifact} active={artifact.path === selected?.path} onClick={() => setSelectedPath(artifact.path)} />)}{!artifacts.length && <p className="empty">Files will appear as the agents finish.</p>}</nav><div className="artifact-preview"><div><b>{selected?.path ?? 'No file selected'}</b>{selected && <span>{selected.agent_id}</span>}</div>{repositoryMode && selected ? <RepositoryDiff artifact={selected} /> : <pre>{selected?.content ?? 'Start a run to generate a project.'}</pre>}</div></div></div>
+      <div className="panel activity-panel-live">{repositoryMode ? <RepositoryChanges artifacts={artifacts} onSelect={setSelectedPath} /> : <><div className="panel-title"><h2>Persisted activity</h2><span>Databricks · {traces.length} events</span></div><ol className="event-list">{traces.map(trace => <li key={trace.trace_id}><b>{trace.agent_id ?? 'coordinator'}</b><span>{trace.event_type.replaceAll('_', ' ')}</span><p>{typeof trace.payload.message === 'string' ? trace.payload.message : 'Trace event recorded.'}</p><small>{trace.run_id ?? trace.source} · {new Date(trace.timestamp).toLocaleTimeString()}</small></li>)}{!traces.length && <li className="empty">{run ? <><LoaderCircle size={15} className="spin" /> Waiting for persisted activity…</> : 'Persisted activity appears after a run starts.'}</li>}</ol></>}</div>
     </section>
-  </main>;
+  </div>;
+}
+
+function RepositoryChanges({ artifacts, onSelect }: { artifacts: LiveArtifact[]; onSelect: (path: string) => void }) {
+  return <><div className="panel-title"><h2>Change set</h2><span>{artifacts.length} additions</span></div><div className="repo-commit-note"><GitCommitHorizontal size={16} /><div><strong>Ready for continued development</strong><span>Generated files are in the local Git workspace. Add a remote when you are ready to commit and push.</span></div></div><ol className="event-list">{artifacts.map(artifact => <li key={artifact.path}><FileCode2 size={15} /><b>A</b><button className="repo-file-link" onClick={() => onSelect(artifact.path)}>{artifact.path}</button><small>{artifact.agent_id}</small></li>)}{!artifacts.length && <li className="empty">No generated changes yet.</li>}</ol></>;
+}
+
+function RepositoryDiff({ artifact }: { artifact: LiveArtifact }) {
+  const lines = artifact.content.split('\n');
+  return <div className="repo-diff"><div className="repo-diff-caption"><span>New file</span><span>{lines.length - 1} lines</span></div><pre>{lines.map((line, index) => <span key={index} className="repo-diff-line"><i>{index + 1}</i><b>+</b><code>{line || ' '}</code></span>)}</pre></div>;
 }
 
 function ArtifactButton({ artifact, active, onClick }: { artifact: LiveArtifact; active: boolean; onClick: () => void }) {

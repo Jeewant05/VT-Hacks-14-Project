@@ -82,3 +82,17 @@ def test_changeset_drift_is_rejected_before_convergence(tmp_path):
     workstream = next(item for item in state["workstreams"] if item["id"] == "workstream-agent-3")
     assert workstream["state"] == "FAILED"
     assert any(conflict["type"] == "INTENT_DRIFT" for conflict in state["conflicts"])
+
+
+def test_orchestrator_agent_records_a_resolution_proposal(tmp_path):
+    client = _client(tmp_path)
+    client.post("/api/objectives")
+    for agent_id in ("demo-agent-1", "demo-agent-2", "demo-agent-3"):
+        client.post(f"/api/agents/{agent_id}/plan")
+
+    state = client.post("/api/objectives/objective-oauth/orchestrate")
+    assert state.status_code == 200
+    body = state.json()
+    proposal = next(conflict for conflict in body["conflicts"] if conflict["status"] == "RESOLUTION_PROPOSED")
+    assert proposal["resolution"]["reasoning"]
+    assert any(event["event_type"] == "orchestrator_proposal" for event in body["events"])
