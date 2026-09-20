@@ -83,7 +83,7 @@ The database defaults to `.local/synapse.db`. Reset touches only local workspace
 
 Pydantic models in `server/app/models.py` are the source of truth. Run `npm run contracts` after model or endpoint changes, and commit all generated files. Do not edit `ui/src/api.generated.ts` manually. Exact dependency resolutions are committed in `uv.lock` and `package-lock.json`; use `uv sync --locked` and `npm ci` for repeatable installs.
 
-The coordinator exposes health/state reads plus agent join, workstream claim, contract declaration, scope reassignment, ChangeSet submission, and local reset endpoints. The guided UI calls these endpoints through the Vite `/api` proxy. The official Python MCP SDK is installed, but no MCP transport or tools are exposed yet. Production hosting/proxy configuration remains outside this milestone.
+The coordinator exposes health/state reads plus agent join, workstream claim, contract declaration, scope reassignment, ChangeSet submission, and local reset endpoints. The guided UI calls these endpoints through the Vite `/api` proxy. An MCP server (`uv run python -m server.mcp_server`, stdio) exposes the same six operations as tools, so any MCP-capable coding agent can join, declare, scope and submit through the coordinator. Production hosting/proxy configuration remains outside this milestone.
 
 The stricter orchestration API lives under `/api`. It registers three codebase demo agents, requires a structured Intention Document before execution, blocks deterministic file/symbol/contract/dependency/permission conflicts, validates submitted ChangeSets against their approved intention, and records the workflow through the configured trace sink. See [the three-agent workflow](agents/README.md#three-agent-orchestration-demo).
 
