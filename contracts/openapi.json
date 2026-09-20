@@ -478,6 +478,48 @@
         }
       }
     },
+    "/api/objectives/{objective_id}/orchestrate": {
+      "post": {
+        "tags": [
+          "orchestration"
+        ],
+        "summary": "Orchestrate",
+        "operationId": "orchestrate_api_objectives__objective_id__orchestrate_post",
+        "parameters": [
+          {
+            "name": "objective_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Objective Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrchestrationState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/agents/{agent_id}/plan": {
       "post": {
         "tags": [
@@ -859,6 +901,23 @@
       }
     },
     "/api/live/runs": {
+      "get": {
+        "tags": [
+          "live-agents"
+        ],
+        "summary": "Recent Runs",
+        "operationId": "recent_runs_api_live_runs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "live-agents"

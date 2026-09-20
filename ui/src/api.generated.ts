@@ -197,6 +197,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/objectives/{objective_id}/orchestrate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Orchestrate */
+        post: operations["orchestrate_api_objectives__objective_id__orchestrate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agents/{agent_id}/plan": {
         parameters: {
             query?: never;
@@ -357,7 +374,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Recent Runs */
+        get: operations["recent_runs_api_live_runs_get"];
         put?: never;
         /** Start */
         post: operations["start_api_live_runs_post"];
@@ -1387,6 +1405,37 @@ export interface operations {
             };
         };
     };
+    orchestrate_api_objectives__objective_id__orchestrate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                objective_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrchestrationState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     plan_api_agents__agent_id__plan_post: {
         parameters: {
             query?: never;
@@ -1648,6 +1697,26 @@ export interface operations {
         };
     };
     config_api_live_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    recent_runs_api_live_runs_get: {
         parameters: {
             query?: never;
             header?: never;
