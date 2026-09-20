@@ -65,8 +65,7 @@ export function LiveDashboard({ onHub, repositoryMode = false }: { onHub?: (hasR
 
   async function start() {
     if (!objective.trim()) { setError('Describe the change you want the team to make.'); return; }
-    const previewTab = openWaitingTab(objective);
-    setPreviewStatus(previewTab ? 'Interactive app tab opened; it will update when the agents finish.' : 'Popups are blocked. You can open the app here when the agents finish.');
+    setPreviewStatus('The interactive preview will appear below when the agents finish.');
     setBusy(true); setError(''); setEvents([]); setTraces([]); setRun(null); setSelectedPath('shared/api-contract.json');
     sourceRef.current?.close();
     try {
@@ -79,32 +78,24 @@ export function LiveDashboard({ onHub, repositoryMode = false }: { onHub?: (hasR
           source.close();
           void refresh(result.run_id).then(snapshot => {
             if (!snapshot.preview_url) return;
-            if (previewTab && !previewTab.closed) {
-              previewTab.location.replace(snapshot.preview_url);
-              setPreviewStatus('Interactive app is ready in its tab.');
-            } else {
-              setPreviewStatus('Interactive app is ready. Open it below.');
-            }
-          }).catch(() => setPreviewStatus('The run finished, but the preview could not be opened automatically.'));
+            setPreviewStatus('Interactive app is ready below.');
+          }).catch(() => setPreviewStatus('The run finished, but the preview could not be loaded.'));
         }
         if (event.event_type === 'run_failed') {
           source.close();
-          showTabFailure(previewTab, event.message);
           setPreviewStatus('The agents did not produce a valid interactive app.');
         }
       });
       source.onerror = () => {
         source.close();
         void refresh(result.run_id).then(snapshot => {
-          if (snapshot.status === 'complete' && snapshot.preview_url && previewTab && !previewTab.closed) {
-            previewTab.location.replace(snapshot.preview_url);
-            setPreviewStatus('Interactive app is ready in its tab.');
+          if (snapshot.status === 'complete' && snapshot.preview_url) {
+            setPreviewStatus('Interactive app is ready below.');
           }
         }).catch(() => undefined);
       };
       sourceRef.current = source;
     } catch (cause) {
-      previewTab?.close();
       setError(cause instanceof Error ? cause.message : 'Could not start the coding agents.');
     } finally { setBusy(false); }
   }
@@ -144,6 +135,13 @@ export function LiveDashboard({ onHub, repositoryMode = false }: { onHub?: (hasR
       return <article className={`agent-card-live state-${roleStatus[agent].toLowerCase().replaceAll(' ', '-')}`} key={agent}><div className="agent-dot" /><div><h2>{details?.title ?? agent}<span className={details?.configured ? 'api-ready' : 'api-missing'}>{details?.configured ? 'API ready' : 'API missing'}</span></h2><p>{details?.responsibility}</p>{details?.configured && <p className="agent-provider">{details.provider} · {details.model}</p>}{run?.intentions[agent] && <blockquote className="agent-intention"><b>Intention</b>{run.intentions[agent]}</blockquote>}<small>{roleStatus[agent]}{count ? ` · ${count} file${count === 1 ? '' : 's'}` : ''}</small></div></article>;
     })}</section>}
 
+    {!repositoryMode && run && <section className="panel live-app-preview">
+      <div className="live-preview-heading"><div><p className="eyebrow">GENERATED APPLICATION</p><h2>Interactive preview</h2><span>{previewStatus}</span></div>{run.preview_url && <button className="secondary" onClick={() => openFinishedApp(run.preview_url!)}>Expand <ExternalLink size={14} /></button>}</div>
+      {run.preview_url
+        ? <iframe title="Generated interactive application" src={run.preview_url} sandbox="allow-scripts" referrerPolicy="no-referrer" />
+        : <div className={`live-preview-waiting ${run.status === 'failed' ? 'failed' : ''}`}>{run.status === 'failed' ? <><strong>Preview unavailable</strong><p>{run.failure_title ?? 'The generated application did not pass validation.'}</p></> : <><LoaderCircle size={28} className="spin" /><strong>Building your application…</strong><p>The preview will load here automatically after all three agents finish.</p></>}</div>}
+    </section>}
+
     <section className={`live-workspace ${repositoryMode ? 'repository-workspace' : ''}`}>
       {(!repositoryMode || repositoryTab === 'code') && <div className="panel artifact-panel"><div className="panel-title"><h2>{repositoryMode ? 'Files changed in this run' : 'Generated project'}</h2><span>{visibleArtifacts.length} files</span></div>{repositoryMode && <div className="repo-status-bar"><span><GitBranch size={14} /> {repositoryBranch}</span><span><GitCompareArrows size={14} /> {artifacts.length} added files</span><span><UploadCloud size={14} /> Remote push not configured</span></div>}<div className="artifact-browser"><nav>{visibleArtifacts.map(artifact => <ArtifactButton key={artifact.path} artifact={artifact} active={artifact.path === selected?.path} onClick={() => setSelectedPath(artifact.path)} />)}{!visibleArtifacts.length && <p className="empty">{artifacts.length ? 'No files match your search.' : 'Run the agents first; the latest generated files will appear here.'}</p>}</nav><div className="artifact-preview"><div><b>{selected?.path ?? 'No file selected'}</b>{selected && <span>{selected.agent_id}</span>}</div>{repositoryMode && selected ? <RepositoryDiff artifact={selected} /> : <pre>{selected?.content ?? 'Start a run to generate a project.'}</pre>}</div></div></div>}
       {repositoryMode && repositoryTab === 'changes' && <div className="panel repository-full-panel"><RepositoryChanges artifacts={visibleArtifacts} onSelect={path => { setSelectedPath(path); setRepositoryTab('code'); }} /></div>}
@@ -151,37 +149,6 @@ export function LiveDashboard({ onHub, repositoryMode = false }: { onHub?: (hasR
       {!repositoryMode && <div className="panel activity-panel-live"><RepositoryActivity traces={traces} waiting={Boolean(run)} /></div>}
     </section>
   </div>;
-}
-
-function openWaitingTab(objective: string) {
-  const tab = window.open('', '_blank');
-  if (!tab) return null;
-  tab.document.title = 'Synapse · Building your app';
-  const style = tab.document.createElement('style');
-  style.textContent = 'body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0d1511;color:#eef7f1;font-family:Inter,system-ui,sans-serif}.card{width:min(560px,calc(100% - 48px));padding:38px;border:1px solid #294237;border-radius:22px;background:#14211b;box-shadow:0 24px 80px #0008}.pulse{width:12px;height:12px;border-radius:50%;background:#67e8a6;box-shadow:0 0 0 0 #67e8a688;animation:p 1.5s infinite}@keyframes p{70%{box-shadow:0 0 0 14px #67e8a600}}h1{font-size:30px;margin:20px 0 10px}p{color:#a9bcb1;line-height:1.6}small{display:block;margin-top:22px;color:#6f8b7c}';
-  tab.document.head.append(style);
-  const card = tab.document.createElement('main');
-  card.className = 'card';
-  const pulse = tab.document.createElement('div');
-  pulse.className = 'pulse';
-  const heading = tab.document.createElement('h1');
-  heading.textContent = 'Three agents are building your app';
-  const detail = tab.document.createElement('p');
-  detail.textContent = objective;
-  const note = tab.document.createElement('small');
-  note.textContent = 'This tab will switch to the finished interactive application automatically.';
-  card.append(pulse, heading, detail, note);
-  tab.document.body.replaceChildren(card);
-  return tab;
-}
-
-function showTabFailure(tab: Window | null, message: string) {
-  if (!tab || tab.closed) return;
-  tab.document.title = 'Synapse · Build failed';
-  const heading = tab.document.querySelector('h1');
-  const detail = tab.document.querySelector('p');
-  if (heading) heading.textContent = 'The app could not be built';
-  if (detail) detail.textContent = message;
 }
 
 function openFinishedApp(previewUrl: string) {

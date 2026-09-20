@@ -6,8 +6,8 @@
 2. Open the live dashboard, enter a small full-stack objective, and start the agents.
 3. Watch all three agents publish an intention. Explain that these plans are injected into every implementation prompt before any file is written.
 4. Point out that backend and frontend then build concurrently using separate APIs, exclusive directory ownership, and one shared contract.
-5. A waiting application tab opens immediately. The integration agent reviews the staged output; after validation, all files are committed to the run sandbox together.
-6. The waiting tab automatically switches to the finished application preview. If popups are blocked, use **Open finished app** in the dashboard.
+5. An application preview box appears inside the dashboard while the integration agent reviews the staged output; after validation, all files are committed to the run sandbox together.
+6. The preview box automatically switches to the finished interactive application. Use **Expand** only when you want a larger separate view.
 
 Be precise in the presentation: the displayed files and `frontend/preview.html` are genuinely returned by the configured provider (Virginia Tech ARC by default), written to an isolated local run directory, and committed to that run's Git repository. Synapse validates boundaries and serves the generated app in an opaque-origin browser sandbox. Inline JavaScript is allowed so games and workflows are interactive, while network access, parent-page access, external assets, navigation, and form submission remain blocked. Use the guided simulation when a token or network connection is unavailable.
 
@@ -33,7 +33,7 @@ The pasted deadline is provisional: confirm this year's submission time and vide
 
 Set in `.env`: `BACKEND_PROVIDER=arc`, `FRONTEND_PROVIDER=arc`, `QA_PROVIDER=arc`, and an ARC key in `ARC_API_KEY_BACKEND`, `ARC_API_KEY_FRONTEND`, and `ARC_API_KEY_QA`. The model defaults to `gpt-oss-120b`; role-specific `ARC_MODEL_*` overrides are optional. Restart `npm run dev:server`.
 
-In the dashboard start the three coding agents. They publish intentions first, backend and frontend build in parallel, integration reviews the staged files, and the coordinator commits the validated run artifacts. The frontend agent also generates a standalone interactive application that opens in the waiting tab after validation. Each card shows its actual provider and model.
+In the dashboard start the three coding agents. They publish intentions first, backend and frontend build in parallel, integration reviews the staged files, and the coordinator commits the validated run artifacts. The frontend agent also generates a standalone interactive application that loads inside the dashboard preview after validation. Each card shows its actual provider and model.
 
 From a terminal: `curl -s -X POST localhost:8000/api/live/runs -H 'Content-Type: application/json' -d '{"objective":"Add organization OAuth login"}'` then `curl -s -N localhost:8000/api/live/runs/<run_id>/events`.
 
