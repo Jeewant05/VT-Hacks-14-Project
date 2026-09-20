@@ -73,10 +73,10 @@ h2 { font-size: 1rem; font-weight: 650; }
 
 /* ---------- live view shares the frame ---------- */
 .live-shell { background: var(--page); color: var(--ink); padding: 0 0 48px; }
-.live-header { background: var(--sidebar); color: var(--chrome-ink); padding: 34px clamp(20px, 5vw, 80px); margin: 0 0 24px; border-bottom: 1px solid var(--chrome-line); }
+.live-header { max-width: none; width: 100%; box-sizing: border-box; background: var(--sidebar); color: var(--chrome-ink); padding: 34px max(clamp(20px, 5vw, 80px), calc((100% - 1180px) / 2)); margin: 0 0 24px; border-bottom: 1px solid var(--chrome-line); display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
 .live-header h1 { color: #fff; }
 .live-header p { color: var(--chrome-muted); }
-.live-header button.secondary { background: transparent; color: var(--chrome-ink); border: 1px solid #3a5546; }
+.live-header button.secondary { background: transparent; color: var(--chrome-ink); border: 1px solid #3a5546; white-space: nowrap; flex: 0 0 auto; }
 .live-header button.secondary:hover { background: #1f3128; }
 .prompt-card, .panel, .error-card, .live-agent-grid, .live-workspace, .repository-controls, .repository-tabs { margin-left: auto; margin-right: auto; max-width: 1180px; }
 .live-agent-grid, .live-workspace { padding: 0 clamp(20px, 5vw, 80px); }
