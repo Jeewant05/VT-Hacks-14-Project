@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FileCode2, GitBranch, GitCommitHorizontal, GitCompareArrows, LoaderCircle, UploadCloud } from 'lucide-react';
+import { Check, Copy, ExternalLink, FileCode2, GitBranch, GitCommitHorizontal, GitCompareArrows, History, LoaderCircle, Search, UploadCloud } from 'lucide-react';
 import {
-  getLiveConfig, getLiveRun, getLiveTraces, startLiveRun, subscribeLiveRun,
+  getLiveConfig, getLiveRun, getLiveRuns, getLiveTraces, startLiveRun, subscribeLiveRun,
   type LiveArtifact, type LiveConfig, type LiveEvent, type LiveSnapshot, type LiveTrace,
 } from './liveAgents';
 
@@ -17,16 +17,31 @@ export function LiveDashboard({ onHub, repositoryMode = false }: { onHub?: (hasR
   const [selectedPath, setSelectedPath] = useState('shared/api-contract.json');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [repositoryTab, setRepositoryTab] = useState<'code' | 'changes' | 'activity'>('code');
+  const [repositoryQuery, setRepositoryQuery] = useState('');
+  const [repositoryBranch, setRepositoryBranch] = useState('main');
+  const [copied, setCopied] = useState(false);
   const sourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
     void getLiveConfig().then(setConfig).catch(cause => {
       setError(cause instanceof Error ? cause.message : 'Could not load agent configuration.');
     });
+    if (repositoryMode) {
+      void getLiveRuns().then(runs => {
+        const latest = runs[0];
+        if (!latest) return;
+        setRun(latest);
+        setSelectedPath(latest.artifacts[0]?.path ?? 'shared/api-contract.json');
+        setRepositoryBranch(`run/${latest.run_id.replace('run-', '')}`);
+        void getLiveTraces(latest.run_id).then(setTraces).catch(() => undefined);
+      }).catch(cause => setError(cause instanceof Error ? cause.message : 'Could not load recent runs.'));
+    }
     return () => sourceRef.current?.close();
-  }, []);
+  }, [repositoryMode]);
 
   const artifacts = run?.artifacts ?? [];
+  const visibleArtifacts = artifacts.filter(artifact => artifact.path.toLowerCase().includes(repositoryQuery.toLowerCase()));
   const selected = artifacts.find(item => item.path === selectedPath) ?? artifacts[0];
   const roleStatus = useMemo(() => Object.fromEntries(roleIds.map(role => {
     const roleEvents = events.filter(event => event.agent_id === role);
@@ -76,6 +91,13 @@ export function LiveDashboard({ onHub, repositoryMode = false }: { onHub?: (hasR
     setSelectedPath('shared/api-contract.json');
   }
 
+  function copyWorkspace() {
+    if (!run?.workspace) return;
+    void navigator.clipboard?.writeText(run.workspace);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  }
+
   return <div className="live-shell">
     <header className="live-header">
       <div><p className="eyebrow">SYNAPSE · {repositoryMode ? 'REPOSITORY' : 'COORDINATED CODE WORKSPACE'}</p><h1>{repositoryMode ? 'Generated project repository' : 'See independent agents coordinate one change.'}</h1><p>{repositoryMode ? 'Browse the real files created by the latest coordinated run. Each entry is owned by one agent and is ready for continued development.' : 'Agents publish intent before writing. Synapse validates ownership, records the decision trail, and writes the approved result into a real local Git workspace.'}</p></div>{onHub && <button className="secondary" onClick={() => onHub(Boolean(run))}>Open workspace hub</button>}
@@ -90,17 +112,25 @@ export function LiveDashboard({ onHub, repositoryMode = false }: { onHub?: (hasR
 
     {error && <div className="error-card"><strong>Live run error</strong><pre>{error}</pre></div>}
 
+    {repositoryMode && <><div className="repository-controls"><label><GitBranch size={15} /><span className="sr-only">Branch</span><select value={repositoryBranch} onChange={event => setRepositoryBranch(event.target.value)}><option value={repositoryBranch}>{repositoryBranch}</option><option value="main">main</option></select></label><div className="repository-search"><Search size={15} /><input aria-label="Find a generated file" placeholder="Find a file" value={repositoryQuery} onChange={event => setRepositoryQuery(event.target.value)} /></div><button onClick={copyWorkspace} disabled={!run?.workspace}>{copied ? <Check size={15} /> : <Copy size={15} />}{copied ? 'Copied path' : 'Copy workspace path'}</button><a href="https://github.com/Jeewant05/VT-Hacks-14-Project" target="_blank" rel="noreferrer">GitHub <ExternalLink size={14} /></a></div><div className="repository-tabs" role="tablist"><button role="tab" aria-selected={repositoryTab === 'code'} onClick={() => setRepositoryTab('code')}><FileCode2 size={15} />Code <span>{artifacts.length}</span></button><button role="tab" aria-selected={repositoryTab === 'changes'} onClick={() => setRepositoryTab('changes')}><GitCompareArrows size={15} />Changes <span>{artifacts.length}</span></button><button role="tab" aria-selected={repositoryTab === 'activity'} onClick={() => setRepositoryTab('activity')}><History size={15} />Activity <span>{traces.length}</span></button></div></>}
+
     {!repositoryMode && <section className="live-agent-grid">{roleIds.map(agent => {
       const details = config?.roles.find(role => role.id === agent);
       const count = artifacts.filter(item => item.agent_id === agent).length;
       return <article className={`agent-card-live state-${roleStatus[agent].toLowerCase().replaceAll(' ', '-')}`} key={agent}><div className="agent-dot" /><div><h2>{details?.title ?? agent}<span className={details?.configured ? 'api-ready' : 'api-missing'}>{details?.configured ? 'API ready' : 'API missing'}</span></h2><p>{details?.responsibility}</p>{details?.configured && <p className="agent-provider">{details.provider} · {details.model}</p>}{run?.intentions[agent] && <blockquote className="agent-intention"><b>Intention</b>{run.intentions[agent]}</blockquote>}<small>{roleStatus[agent]}{count ? ` · ${count} file${count === 1 ? '' : 's'}` : ''}</small></div></article>;
     })}</section>}
 
-    <section className="live-workspace">
-      <div className="panel artifact-panel"><div className="panel-title"><h2>{repositoryMode ? 'Files changed in this run' : 'Generated project'}</h2><span>{artifacts.length} files</span></div>{repositoryMode && <div className="repo-status-bar"><span><GitBranch size={14} /> local workspace</span><span><GitCompareArrows size={14} /> {artifacts.length} added files</span><span><UploadCloud size={14} /> Remote push not configured</span></div>}<div className="artifact-browser"><nav>{artifacts.map(artifact => <ArtifactButton key={artifact.path} artifact={artifact} active={artifact.path === selected?.path} onClick={() => setSelectedPath(artifact.path)} />)}{!artifacts.length && <p className="empty">Files will appear as the agents finish.</p>}</nav><div className="artifact-preview"><div><b>{selected?.path ?? 'No file selected'}</b>{selected && <span>{selected.agent_id}</span>}</div>{repositoryMode && selected ? <RepositoryDiff artifact={selected} /> : <pre>{selected?.content ?? 'Start a run to generate a project.'}</pre>}</div></div></div>
-      <div className="panel activity-panel-live">{repositoryMode ? <RepositoryChanges artifacts={artifacts} onSelect={setSelectedPath} /> : <><div className="panel-title"><h2>Persisted activity</h2><span>Databricks · {traces.length} events</span></div><ol className="event-list">{traces.map(trace => <li key={trace.trace_id}><b>{trace.agent_id ?? 'coordinator'}</b><span>{trace.event_type.replaceAll('_', ' ')}</span><p>{typeof trace.payload.message === 'string' ? trace.payload.message : 'Trace event recorded.'}</p><small>{trace.run_id ?? trace.source} · {new Date(trace.timestamp).toLocaleTimeString()}</small></li>)}{!traces.length && <li className="empty">{run ? <><LoaderCircle size={15} className="spin" /> Waiting for persisted activity…</> : 'Persisted activity appears after a run starts.'}</li>}</ol></>}</div>
+    <section className={`live-workspace ${repositoryMode ? 'repository-workspace' : ''}`}>
+      {(!repositoryMode || repositoryTab === 'code') && <div className="panel artifact-panel"><div className="panel-title"><h2>{repositoryMode ? 'Files changed in this run' : 'Generated project'}</h2><span>{visibleArtifacts.length} files</span></div>{repositoryMode && <div className="repo-status-bar"><span><GitBranch size={14} /> {repositoryBranch}</span><span><GitCompareArrows size={14} /> {artifacts.length} added files</span><span><UploadCloud size={14} /> Remote push not configured</span></div>}<div className="artifact-browser"><nav>{visibleArtifacts.map(artifact => <ArtifactButton key={artifact.path} artifact={artifact} active={artifact.path === selected?.path} onClick={() => setSelectedPath(artifact.path)} />)}{!visibleArtifacts.length && <p className="empty">{artifacts.length ? 'No files match your search.' : 'Run the agents first; the latest generated files will appear here.'}</p>}</nav><div className="artifact-preview"><div><b>{selected?.path ?? 'No file selected'}</b>{selected && <span>{selected.agent_id}</span>}</div>{repositoryMode && selected ? <RepositoryDiff artifact={selected} /> : <pre>{selected?.content ?? 'Start a run to generate a project.'}</pre>}</div></div></div>}
+      {repositoryMode && repositoryTab === 'changes' && <div className="panel repository-full-panel"><RepositoryChanges artifacts={visibleArtifacts} onSelect={path => { setSelectedPath(path); setRepositoryTab('code'); }} /></div>}
+      {repositoryMode && repositoryTab === 'activity' && <div className="panel repository-full-panel"><RepositoryActivity traces={traces} /></div>}
+      {!repositoryMode && <div className="panel activity-panel-live"><RepositoryActivity traces={traces} waiting={Boolean(run)} /></div>}
     </section>
   </div>;
+}
+
+function RepositoryActivity({ traces, waiting = false }: { traces: LiveTrace[]; waiting?: boolean }) {
+  return <><div className="panel-title"><h2>Persisted activity</h2><span>{traces.length} events</span></div><ol className="event-list">{traces.map(trace => <li key={trace.trace_id}><b>{trace.agent_id ?? 'coordinator'}</b><span>{trace.event_type.replaceAll('_', ' ')}</span><p>{typeof trace.payload.message === 'string' ? trace.payload.message : 'Trace event recorded.'}</p><small>{trace.run_id ?? trace.source} · {new Date(trace.timestamp).toLocaleTimeString()}</small></li>)}{!traces.length && <li className="empty">{waiting ? <><LoaderCircle size={15} className="spin" /> Waiting for persisted activity…</> : 'No activity has been recorded for this run.'}</li>}</ol></>;
 }
 
 function RepositoryChanges({ artifacts, onSelect }: { artifacts: LiveArtifact[]; onSelect: (path: string) => void }) {

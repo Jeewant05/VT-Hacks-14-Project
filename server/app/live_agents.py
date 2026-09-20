@@ -134,6 +134,8 @@ class LiveRun:
             "run_id": self.run_id,
             "objective": self.objective,
             "status": self.status,
+            "workspace": str(self.root),
+            "git_repository": (self.root / ".git").is_dir(),
             "artifacts": [artifact.as_dict() for artifact in self.artifacts],
             "intentions": self.intentions,
             "reports": self.reports,
@@ -148,6 +150,13 @@ class LiveRun:
     async def execute(self) -> None:
         self.status = "planning"
         self.root.mkdir(parents=True, exist_ok=False)
+        git = await asyncio.create_subprocess_exec(
+            "git", "init", "-b", "main", cwd=self.root,
+            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+        )
+        if await git.wait() != 0:
+            raise RuntimeError("could not initialize the generated Git workspace")
+        self._persist()
         self.emit("coordinator", "run_started", "Created an isolated project workspace")
         contract = self._contract()
 
@@ -182,6 +191,7 @@ class LiveRun:
             self.status = "failed"
             self.error = str(exc)[:1_000]
             self.emit("coordinator", "run_failed", self.error)
+            self._persist()
             return
 
         self.status = "complete"
@@ -190,6 +200,7 @@ class LiveRun:
             "run_complete",
             f"Committed {len(staged)} agent files after intention and scope validation",
         )
+        self._persist()
 
     async def _plan(self, role: AgentRole, contract: dict[str, Any]) -> str:
         self.emit(role.id, "intention_started", f"{role.title} is planning before coding")
@@ -248,7 +259,7 @@ Hard limits -- a response outside them is rejected:
             # three-agent run, and the model can fix a stated problem.
             self.emit(role.id, "proposal_retry", f"{problem}; asking once more")
             proposal, problem = self._read_proposal(await provider.generate(
-                f"{prompt}\nYour previous answer was rejected: {problem}.\n"
+                f"{prompt}\nYour previous proposal was invalid and rejected: {problem}.\n"
                 "Return the complete JSON again, within the limits."
             ))
         if problem or proposal is None:
@@ -268,7 +279,7 @@ Hard limits -- a response outside them is rejected:
             proposal = self._json(raw)
         except json.JSONDecodeError as exc:
             return None, (
-                f"returned malformed JSON ({exc.msg} at line {exc.lineno} column {exc.colno}); "
+                f"was not valid JSON ({exc.msg} at line {exc.lineno} column {exc.colno}); "
                 "escape newlines, quotes, and backslashes inside every file content string"
             )
         except TypeError:
@@ -361,6 +372,47 @@ Hard limits -- a response outside them is rejected:
         destination.write_text(artifact.content, encoding="utf-8")
         self.artifacts.append(artifact)
 
+    def _persist(self) -> None:
+        data = self.snapshot() | {"preview_html": self.preview_html}
+        (self.root / ".synapse-run.json").write_text(
+            json.dumps(data, indent=2) + "\n", encoding="utf-8"
+        )
+
+    @classmethod
+    def load(cls, root: Path) -> "LiveRun | None":
+        metadata = root / ".synapse-run.json"
+        if not metadata.is_file():
+            return None
+        try:
+            data = json.loads(metadata.read_text(encoding="utf-8"))
+            run = cls(str(data["run_id"]), str(data.get("objective", "Recovered run")), root, {})
+            run.status = str(data.get("status", "complete"))
+            run.intentions = dict(data.get("intentions", {}))
+            run.reports = dict(data.get("reports", {}))
+            run.error = data.get("error")
+            run.preview_html = data.get("preview_html")
+            run.artifacts = [Artifact(**item) for item in data.get("artifacts", [])]
+            return run
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+            return None
+
+    @classmethod
+    def recover(cls, root: Path) -> "LiveRun | None":
+        if not root.is_dir():
+            return None
+        run = cls(root.name, "Recovered generated project", root, {})
+        for path in sorted(root.rglob("*")):
+            if not path.is_file() or ".git" in path.parts or path.name == ".synapse-run.json":
+                continue
+            relative = path.relative_to(root).as_posix()
+            owner = relative.split("/", 1)[0]
+            run.artifacts.append(Artifact(relative, owner, path.read_text(encoding="utf-8")))
+        if not run.artifacts:
+            return None
+        run.status = "complete"
+        run._persist()
+        return run
+
     @staticmethod
     def _contract() -> dict[str, Any]:
         return {
@@ -398,6 +450,11 @@ class LiveRuns:
     def __init__(self, providers: dict[str, Provider], root: Path, trace: TraceSink):
         self.providers, self.root, self.trace = providers, root, trace
         self.runs: dict[str, LiveRun] = {}
+        if root.is_dir():
+            for workspace in sorted(root.glob("run-*"), key=lambda path: path.stat().st_mtime):
+                run = LiveRun.load(workspace) or LiveRun.recover(workspace)
+                if run is not None:
+                    self.runs[run.run_id] = run
 
     @property
     def configured(self) -> bool:
@@ -426,3 +483,7 @@ class LiveRuns:
         if run_id not in self.runs:
             raise KeyError(run_id)
         return self.runs[run_id]
+
+    def recent(self, limit: int = 20) -> list[LiveRun]:
+        """Return newest in-process runs first for the repository browser."""
+        return list(reversed(self.runs.values()))[:limit]

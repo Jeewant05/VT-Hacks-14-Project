@@ -14,8 +14,8 @@ from server.app.live_agents import LiveRuns
 from server.app.live_routes import build_live_router
 from server.app.models import Health, WorkspaceState
 from server.app.orchestration import OrchestrationKernel
-from server.app.orchestrator_agent import OrchestratorAgent
 from server.app.orchestration_routes import build_orchestration_router
+from server.app.orchestrator_agent import OrchestratorAgent
 from server.app.providers import ProviderError, build_agent_providers, build_provider
 from server.app.routes import build_router
 from server.app.service import Coordinator
