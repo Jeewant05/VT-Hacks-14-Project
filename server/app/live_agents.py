@@ -266,7 +266,9 @@ Hard limits -- a response outside them is rejected:
         """
         try:
             proposal = self._json(raw)
-        except (ValueError, TypeError):
+        except json.JSONDecodeError as exc:
+            return None, f"was not valid JSON ({exc.msg} at line {exc.lineno} column {exc.colno})"
+        except TypeError:
             return None, "returned something that was not a single JSON object"
         files = proposal.get("files")
         if not isinstance(files, list) or not isinstance(proposal.get("report"), str):
@@ -361,10 +363,24 @@ Hard limits -- a response outside them is rejected:
 
     @staticmethod
     def _json(raw: str) -> dict[str, Any]:
+        """Parse a model's answer into a JSON object, tolerating common slips.
+
+        Models embed whole source files as JSON strings and routinely leave a raw
+        newline or tab inside one, which the strict parser rejects as "Invalid
+        control character". That is a formatting slip, not a wrong answer, so
+        control characters are allowed. Fenced blocks and prose around the object
+        are tolerated too. Anything genuinely malformed still raises.
+        """
         value = raw.strip()
         if value.startswith("```"):
             value = value.split("\n", 1)[1].rsplit("```", 1)[0]
-        data = json.loads(value)
+        try:
+            data = json.loads(value, strict=False)
+        except json.JSONDecodeError:
+            start, end = value.find("{"), value.rfind("}")
+            if start == -1 or end <= start:
+                raise
+            data = json.loads(value[start : end + 1], strict=False)
         if not isinstance(data, dict):
             raise TypeError("Agent response must be a JSON object")
         return data
