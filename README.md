@@ -20,6 +20,15 @@ No credentials are required for the guided simulation. The default `IDENTITY_MOD
 uses a local allowlist: mock identity results are fixtures, not ANS verification, and
 seeded decisions are local fixtures.
 
+## Deployments
+
+| App | URL | Shows |
+| --- | --- | --- |
+| `synapse-vt` | https://synapse-vt.us | ANS-verified coordinator: badge-tier identity, DPoP proofs, per-agent cards. Live agents are not configured here yet |
+| `synapse-vt-live` | https://synapse-vt-live.fly.dev | Latest dashboard, live three-agent runs on Gemini, Databricks trace persistence (mock identity) |
+
+Reset on either site asks for the operator token. Deployment details, secrets and known issues: [docs/DEPLOY.md](docs/DEPLOY.md).
+
 ## Agent Name Service
 
 `IDENTITY_MODE=ans` performs real Agent Name Service verification: a transparency-log
