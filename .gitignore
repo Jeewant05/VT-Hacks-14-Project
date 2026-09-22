@@ -21,4 +21,3 @@ credentials/
 *.key
 
 .codex/
-fly.live.toml
