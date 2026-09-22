@@ -19,3 +19,6 @@ dist/
 credentials/
 *.pem
 *.key
+
+.codex/
+fly.live.toml
